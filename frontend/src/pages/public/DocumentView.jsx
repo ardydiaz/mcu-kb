@@ -1,0 +1,14 @@
+import { ArrowLeft,FileSpreadsheet,FileText,LoaderCircle,Maximize2,Minimize2 } from 'lucide-react';
+import { useEffect,useRef,useState } from 'react';
+import { Link as RouterLink,useParams,useSearchParams } from 'react-router-dom';
+import { getPublicDocument } from '../../services/adminApi';
+export default function DocumentView(){
+ const {id}=useParams();const [params]=useSearchParams();const requestedReturn=params.get('returnTo')||'';const returnTo=/^\/(search(?:\?|$)|systems$)/.test(requestedReturn)?requestedReturn:'/search';const Link=props=><RouterLink {...props} to={props.to==='/search'?returnTo:props.to}/>;const viewerRef=useRef(null);const [document,setDocument]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [fullscreen,setFullscreen]=useState(false);
+ useEffect(()=>{getPublicDocument(id).then(({data})=>setDocument(data.data)).catch(error=>setError(error.response?.data?.message||'Unable to open this document.')).finally(()=>setLoading(false))},[id]);
+ useEffect(()=>{const changed=()=>setFullscreen(Boolean(globalThis.document.fullscreenElement));globalThis.document.addEventListener('fullscreenchange',changed);return()=>globalThis.document.removeEventListener('fullscreenchange',changed)},[]);
+ const toggleFullscreen=async()=>{try{if(globalThis.document.fullscreenElement)await globalThis.document.exitFullscreen();else await viewerRef.current?.requestFullscreen()}catch{setError('Fullscreen mode is not supported by this browser.')}};
+ if(loading)return <div className="document-view-state"><LoaderCircle className="spin"/> Opening document…</div>;
+ if(error)return <div className="document-view-state"><FileText/><h2>Document unavailable</h2><p>{error}</p><Link to={returnTo}>Return to search</Link></div>;
+ const pdf=document.mime_type==='application/pdf';const excel=document.mime_type?.includes('excel')||document.mime_type?.includes('spreadsheet');
+ return <main className="document-view-page"><header><Link to="/search"><ArrowLeft/> Back to results</Link><div><span>{document.category_name||'GENERAL'} · {document.department}</span><h1>{document.title}</h1><p>{document.original_name} · Version {document.version_number}</p></div></header><section className="viewer-shell" ref={viewerRef}><button className="fullscreen-button" onClick={toggleFullscreen} title={fullscreen?'Exit fullscreen':'View fullscreen'}>{fullscreen?<Minimize2/>:<Maximize2/>}<span>{fullscreen?'Exit fullscreen':'Fullscreen'}</span></button>{pdf?<iframe title={document.title} src={`${document.preview_url}#toolbar=0&navpanes=0&scrollbar=1`}/>:<div className="office-preview"><span>{excel?<FileSpreadsheet/>:<FileText/>}</span><h2>{excel?'Excel preview unavailable':'Word preview unavailable'}</h2><p>This file type cannot be rendered securely by the browser. Public downloading has been disabled by the knowledge-base administrator.</p></div>}</section></main>;
+}
