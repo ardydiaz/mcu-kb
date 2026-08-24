@@ -1,0 +1,1 @@
+import { Router } from 'express';import SystemController from '../controllers/SystemController.js';import asyncHandler from '../utils/asyncHandler.js';const r=Router();r.get('/',asyncHandler(SystemController.list));export default r;

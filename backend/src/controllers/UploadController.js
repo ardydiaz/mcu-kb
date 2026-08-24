@@ -1,0 +1,1 @@
+export default class UploadController{static upload(req,res){if(!req.file)return res.status(400).json({message:'A valid file is required'});res.status(201).json({data:{filename:req.file.filename,path:`/uploads/${req.file.filename}`,size:req.file.size}})}}

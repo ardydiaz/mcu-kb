@@ -1,0 +1,1 @@
+import AnnouncementModel from '../models/AnnouncementModel.js';export default class AnnouncementService{static list(){return AnnouncementModel.list()}static create(data,userId){return AnnouncementModel.create({...data,is_published:data.is_published??1,is_pinned:data.is_pinned??0,created_by:userId})}}

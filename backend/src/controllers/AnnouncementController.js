@@ -1,0 +1,1 @@
+import AnnouncementService from '../services/AnnouncementService.js';export default class AnnouncementController{static async list(req,res){res.json({data:await AnnouncementService.list()})}static async create(req,res){const result=await AnnouncementService.create(req.body,req.user.id);res.status(201).json({data:{id:result.insertId,...req.body}})}}

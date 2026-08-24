@@ -1,0 +1,1 @@
+import { Router } from 'express';import NotificationController from '../controllers/NotificationController.js';import auth from '../middleware/authMiddleware.js';import asyncHandler from '../utils/asyncHandler.js';const r=Router();r.use(auth);r.get('/',asyncHandler(NotificationController.list));r.post('/:id/read',asyncHandler(NotificationController.read));export default r;

@@ -1,0 +1,1 @@
+import { query } from '../config/database.js';export default class SystemVisitModel{static record(systemId,userId,ip){return query('INSERT INTO system_visits (system_id,user_id,ip_address) VALUES (:systemId,:userId,:ip)',{systemId,userId:userId||null,ip})}}

@@ -1,0 +1,15 @@
+import { Router } from 'express';
+import RecentServiceController from '../controllers/RecentServiceController.js';
+import KnowledgeSearchController from '../controllers/KnowledgeSearchController.js';
+import PublicDocumentController from '../controllers/PublicDocumentController.js';
+import optionalAuth from '../middleware/optionalAuthMiddleware.js';
+import auth from '../middleware/authMiddleware.js';
+import asyncHandler from '../utils/asyncHandler.js';
+const router=Router();
+router.use(optionalAuth);
+router.get('/recent-services',asyncHandler(RecentServiceController.list));
+router.get('/documents',auth,asyncHandler(PublicDocumentController.search));
+router.get('/documents/:id',auth,asyncHandler(PublicDocumentController.show));
+router.get('/documents/:id/preview',auth,asyncHandler(PublicDocumentController.preview));
+router.post('/ask',auth,asyncHandler(KnowledgeSearchController.ask));
+export default router;

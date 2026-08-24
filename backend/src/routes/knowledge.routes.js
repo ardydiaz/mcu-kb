@@ -1,0 +1,1 @@
+import {Router} from 'express';import KnowledgeController from '../controllers/KnowledgeController.js';import asyncHandler from '../utils/asyncHandler.js';const router=Router();router.get('/categories',asyncHandler(KnowledgeController.tree));export default router;

@@ -1,0 +1,1 @@
+import RecentServiceService from '../services/RecentServiceService.js';export default class RecentServiceController{static async list(req,res){res.json({data:await RecentServiceService.list(req.user)})}}

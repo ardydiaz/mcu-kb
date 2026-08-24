@@ -1,0 +1,1 @@
+import NotificationService from '../services/NotificationService.js';export default class NotificationController{static async list(req,res){res.json({data:await NotificationService.list()})}static async read(req,res){await NotificationService.markRead(req.user.id,req.params.id);res.json({message:'Notification marked as read'})}}

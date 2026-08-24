@@ -1,0 +1,1 @@
+import AnnouncementModel from '../models/AnnouncementModel.js';import UserAnnouncementReadModel from '../models/UserAnnouncementReadModel.js';export default class NotificationService{static list(){return AnnouncementModel.list()}static markRead(userId,id){return UserAnnouncementReadModel.mark(userId,id)}}

@@ -1,0 +1,1 @@
+import swaggerJSDoc from 'swagger-jsdoc';export default swaggerJSDoc({definition:{openapi:'3.0.3',info:{title:'MCU Knowledge Base API',version:'1.0.0'},servers:[{url:'/api'}]},apis:['./src/routes/*.js']});

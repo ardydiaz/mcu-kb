@@ -1,0 +1,9 @@
+import DepartmentModel from '../models/DepartmentModel.js';
+const fail=(status,message,errors)=>{throw Object.assign(new Error(message),{status,errors})};
+const clean=payload=>{const name=String(payload.name||'').trim(),code=String(payload.code||'').trim().toUpperCase()||null,errors={};if(!name)errors.name='Department name is required.';else if(name.length<2||name.length>150)errors.name='Department name must be between 2 and 150 characters.';if(code&&!/^[A-Z0-9-]{2,30}$/.test(code))errors.code='Code must use 2–30 letters, numbers, or hyphens.';if(Object.keys(errors).length)fail(422,'Please correct the highlighted fields',errors);return{name,code,description:null}};
+export default class DepartmentService{
+ static list(options){return DepartmentModel.list(options)}
+ static async create(payload,userId){const values=clean(payload),duplicate=await DepartmentModel.duplicate(values.name,values.code);if(duplicate)fail(409,'Please correct the highlighted fields',{[duplicate.name.toLowerCase()===values.name.toLowerCase()?'name':'code']:duplicate.deleted_at?'This department already exists in deleted records.':'This department name or code already exists.'});const result=await DepartmentModel.create({...values,userId});return DepartmentModel.byId(result.insertId)}
+ static async update(id,payload,userId){if(!await DepartmentModel.byId(id))fail(404,'Department not found');const values=clean(payload),duplicate=await DepartmentModel.duplicate(values.name,values.code,id);if(duplicate)fail(409,'Please correct the highlighted fields',{[duplicate.name.toLowerCase()===values.name.toLowerCase()?'name':'code']:'This department name or code already exists.'});await DepartmentModel.update(id,{...values,userId});return DepartmentModel.byId(id)}
+ static async remove(id,userId){if(!await DepartmentModel.byId(id))fail(404,'Department not found');await DepartmentModel.softDelete(id,userId)}
+}

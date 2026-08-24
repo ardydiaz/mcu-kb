@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import CategoryController from '../controllers/CategoryController.js';
+import { allowRoles } from '../middleware/roleMiddleware.js';
+import asyncHandler from '../utils/asyncHandler.js';
+const router=Router();
+router.get('/',asyncHandler(CategoryController.list));
+router.post('/',allowRoles(1,2),asyncHandler(CategoryController.create));
+router.patch('/:id',allowRoles(1,2),asyncHandler(CategoryController.update));
+router.delete('/:id',allowRoles(1,2),asyncHandler(CategoryController.remove));
+export default router;

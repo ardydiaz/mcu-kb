@@ -1,0 +1,1 @@
+export const allowRoles=(...roleIds)=>(req,res,next)=>{const roleId=Number(req.user?.role_id);return roleIds.map(Number).includes(roleId)?next():res.status(403).json({message:'An assigned administrator role is required to perform this action',code:'ADMIN_ROLE_REQUIRED'})};

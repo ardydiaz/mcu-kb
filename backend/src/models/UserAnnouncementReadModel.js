@@ -1,0 +1,1 @@
+import { query } from '../config/database.js';export default class UserAnnouncementReadModel{static mark(userId,announcementId){return query('INSERT IGNORE INTO user_announcement_reads (user_id,announcement_id) VALUES (:userId,:announcementId)',{userId,announcementId})}}
