@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import DocumentService from '../services/DocumentService.js';
 import { uploadDirectory } from '../config/multer.js';
+import DocumentPreviewService from '../services/DocumentPreviewService.js';
 
 export default class PublicDocumentController {
  static async search(req,res){
@@ -17,6 +18,7 @@ export default class PublicDocumentController {
   res.json({data:documents.map(document=>({...document,url:`/documents/${document.id}?returnTo=${encodeURIComponent(returnTo)}`}))});
  }
  static async show(req,res){const document=await DocumentService.find(req.params.id,req.user);if(!document)return res.status(404).json({message:'Document not found or access denied'});res.json({data:{...document,preview_url:`/api/public/documents/${document.id}/preview`}})}
+ static async suggestions(req,res){const query=String(req.query.q||'').trim();if(query.length<2)return res.json({data:[]});if(query.length>100)return res.status(422).json({message:'Suggestion query is too long'});res.json({data:await DocumentService.suggestions(query,req.user)})}
  static async preview(req,res){
   const document=await DocumentService.find(req.params.id,req.user,'view');
   if(!document)return res.status(404).json({message:'Document not found or access denied'});
@@ -26,4 +28,5 @@ export default class PublicDocumentController {
   res.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(document.original_name)}`);
   res.sendFile(filePath);
  }
+ static async previewData(req,res){const document=await DocumentService.find(req.params.id,req.user,'view');if(!document)return res.status(404).json({message:'Document not found or access denied'});const filePath=path.join(uploadDirectory,document.stored_name);try{await fs.access(filePath)}catch{return res.status(404).json({message:'Stored file is unavailable'})}res.json({data:await DocumentPreviewService.preview(document,filePath)})}
 }

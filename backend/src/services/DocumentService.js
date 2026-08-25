@@ -11,7 +11,8 @@ const parseTags=value=>parseList(value).slice(0,30);
 const safeJson=value=>{try{return typeof value==='string'?JSON.parse(value):value||[]}catch{return[]}};
 const latestVersionJoin=`JOIN document_versions v ON v.document_id=d.id AND v.version_number=(SELECT MAX(v2.version_number) FROM document_versions v2 WHERE v2.document_id=d.id)`;
 const departmentExpr=`COALESCE(dep.name,d.department)`;
-const selectDocument=`SELECT d.*,${departmentExpr} department_name,dep.code department_code,c.name category_name,c.parent_id category_parent_id,cp.id collection_id,cp.name collection_name,v.id version_id,v.version_number,v.original_name,v.stored_name,v.mime_type,v.file_size,v.created_at version_created_at,u.fullname uploader_name,a.fullname approver_name FROM documents d ${latestVersionJoin} LEFT JOIN categories c ON c.id=d.category_id LEFT JOIN categories cp ON cp.id=c.parent_id LEFT JOIN departments dep ON dep.id=d.department_id JOIN users u ON u.id=d.uploaded_by LEFT JOIN users a ON a.id=d.approved_by`;
+const documentFrom=`FROM documents d ${latestVersionJoin} LEFT JOIN categories c ON c.id=d.category_id LEFT JOIN categories cp ON cp.id=c.parent_id LEFT JOIN departments dep ON dep.id=d.department_id JOIN users u ON u.id=d.uploaded_by LEFT JOIN users a ON a.id=d.approved_by`;
+const selectDocument=`SELECT d.*,${departmentExpr} department_name,dep.code department_code,c.name category_name,c.parent_id category_parent_id,cp.id collection_id,cp.name collection_name,v.id version_id,v.version_number,v.original_name,v.stored_name,v.mime_type,v.file_size,v.created_at version_created_at,u.fullname uploader_name,a.fullname approver_name ${documentFrom}`;
 const mapDocument=row=>({...row,department:row.department_name||row.department,tags:safeJson(row.tags),size:Number(row.file_size),url:`/api/documents/${row.id}/download`});
 const audit=async(executor,documentId,userId,action,metadata={})=>executor.execute('INSERT INTO document_audit_logs (document_id,user_id,action,metadata) VALUES (:documentId,:userId,:action,:metadata)',{documentId,userId,action,metadata:JSON.stringify(metadata)});
 const stopWords=new Set(['a','an','and','are','can','document','file','find','for','from','give','how','i','in','is','me','of','on','please','show','that','the','this','to','what','where','which','who','with']);
@@ -56,8 +57,17 @@ export default class DocumentService {
     return{roles,departments};
   }
 
-  static async search({q='',department='',type='',status='',limit=10,user}={}){
-    const access=accessSql(user);const size=Math.min(Math.max(Number(limit)||10,1),50);const search=clean(q);const terms=searchTerms(search);const params={...access.params,exact:`%${search}%`,department:clean(department),type:clean(type),status:clean(status)};
+  static async permissions(documentId){const rows=await query('SELECT principal_type,principal_value FROM document_permissions WHERE document_id=:documentId ORDER BY principal_type,principal_value',{documentId});return{allowed_role_ids:rows.filter(row=>row.principal_type==='role').map(row=>Number(row.principal_value)),allowed_departments:rows.filter(row=>row.principal_type==='department').map(row=>row.principal_value)}}
+
+  static async update(id,metadata,user){
+    const title=clean(metadata.title);const categoryId=metadata.category_id?Number(metadata.category_id):null;let departmentId=null,department=null;const visibility=['public','internal','restricted'].includes(metadata.visibility)?metadata.visibility:'public';
+    const categories=categoryId?await query("SELECT id,requires_department FROM categories WHERE id=:categoryId AND parent_id IS NOT NULL AND status='active' AND deleted_at IS NULL LIMIT 1",{categoryId}):[];if(!categories.length)throw Object.assign(new Error('Select a valid knowledge section'),{status:422,errors:{category_id:'Select an active child section.'}});const requiresDepartment=Boolean(categories[0].requires_department);
+    if(requiresDepartment){departmentId=Number(metadata.department_id);const departments=await query('SELECT id,name FROM departments WHERE id=:departmentId AND deleted_at IS NULL LIMIT 1',{departmentId});if(!departments.length)throw Object.assign(new Error('Select a valid department'),{status:422,errors:{department_id:'This section requires an owning department.'}});department=departments[0].name}else if(visibility==='internal')throw Object.assign(new Error('Select a valid visibility'),{status:422,errors:{visibility:'Department-only access is unavailable for this section.'}});
+    const connection=await pool.getConnection();try{await connection.beginTransaction();const [result]=await connection.execute('UPDATE documents SET title=:title,department=:department,department_id=:departmentId,category_id=:categoryId,tags=:tags,visibility=:visibility,updated_at=NOW() WHERE id=:id',{id,title,department,departmentId,categoryId,tags:JSON.stringify(parseTags(metadata.tags)),visibility});if(!result.affectedRows){await connection.rollback();return null}await this.replacePermissions(id,{roles:metadata.allowed_role_ids,departments:metadata.allowed_departments},connection);await audit(connection,id,user.id,'metadata_updated',{title,category_id:categoryId,department_id:departmentId,visibility});await connection.commit();const document=await this.find(id,user);return{...document,...await this.permissions(id)}}catch(error){await connection.rollback();throw error}finally{connection.release()}
+  }
+
+  static async search({q='',department='',type='',status='',limit=10,page=1,user,includePagination=false}={}){
+    const access=accessSql(user);const size=Math.min(Math.max(Number(limit)||10,1),50);const currentPage=Math.max(Number(page)||1,1);const offset=(currentPage-1)*size;const search=clean(q);const terms=searchTerms(search);const params={...access.params,exact:`%${search}%`,department:clean(department),type:clean(type),status:clean(status)};
     const fields=['d.title','v.original_name','d.tags','d.description',departmentExpr,'c.name'];
     const matches=terms.map((term,index)=>{params[`term${index}`]=`%${term}%`;return `(${fields.map(field=>`${field} LIKE :term${index}`).join(' OR ')})`});
     const rankParts=terms.flatMap((_,index)=>[`IF(d.title LIKE :term${index},25,0)`,`IF(v.original_name LIKE :term${index},18,0)`,`IF(d.tags LIKE :term${index},14,0)`,`IF(c.name LIKE :term${index},12,0)`,`IF(${departmentExpr} LIKE :term${index},10,0)`,`IF(d.description LIKE :term${index},4,0)`]);
@@ -66,8 +76,12 @@ export default class DocumentService {
     // returning policies when the user specifically searches for "ITD Forms".
     const searchWhere=search?(matches.length?`(${matches.join(' AND ')})`:`(d.title LIKE :exact OR v.original_name LIKE :exact)`):'1=1';
     const ranking=search?`(IF(d.title LIKE :exact,100,0)+IF(v.original_name LIKE :exact,80,0)+${rankParts.length?rankParts.join('+'):'0'}) DESC,`:'';
-    const rows=await query(`${selectDocument} WHERE ${admin(user)?"(:status='' OR d.status=:status)":"d.status='published'"} AND ${access.clause} AND ${searchWhere} AND (:department='' OR LOWER(${departmentExpr})=LOWER(:department)) AND (:type='' OR (:type='pdf' AND v.mime_type LIKE '%pdf%') OR (:type='word' AND v.mime_type LIKE '%word%') OR (:type='sheet' AND (v.mime_type LIKE '%excel%' OR v.mime_type LIKE '%spreadsheet%'))) ORDER BY ${ranking}d.updated_at DESC LIMIT ${size}`,params);
-    return rows.map(mapDocument);
+    const where=`WHERE ${admin(user)?"(:status='' OR d.status=:status)":"d.status='published'"} AND ${access.clause} AND ${searchWhere} AND (:department='' OR LOWER(${departmentExpr})=LOWER(:department)) AND (:type='' OR (:type='pdf' AND v.mime_type LIKE '%pdf%') OR (:type='word' AND v.mime_type LIKE '%word%') OR (:type='sheet' AND (v.mime_type LIKE '%excel%' OR v.mime_type LIKE '%spreadsheet%')))`;
+    const rows=await query(`${selectDocument} ${where} ORDER BY ${ranking}d.updated_at DESC LIMIT ${size} OFFSET ${offset}`,params);
+    const data=rows.map(mapDocument);
+    if(!includePagination)return data;
+    const totals=await query(`SELECT COUNT(*) total ${documentFrom} ${where}`,params);const total=Number(totals[0]?.total||0);const totalPages=Math.max(Math.ceil(total/size),1);
+    return{data,pagination:{page:Math.min(currentPage,totalPages),per_page:size,total,total_pages:totalPages}};
   }
 
   static async addVersion(documentId,file,user){
@@ -76,7 +90,15 @@ export default class DocumentService {
     try{await connection.beginTransaction();const [versions]=await connection.execute('SELECT COALESCE(MAX(version_number),0)+1 next_version FROM document_versions WHERE document_id=:documentId FOR UPDATE',{documentId});const versionNumber=Number(versions[0].next_version);await connection.execute('INSERT INTO document_versions (id,document_id,version_number,original_name,stored_name,mime_type,file_size,uploaded_by) VALUES (:id,:documentId,:versionNumber,:originalName,:storedName,:mimeType,:fileSize,:uploadedBy)',{id:crypto.randomUUID(),documentId,versionNumber,originalName:file.originalname,storedName:file.filename,mimeType:file.mimetype,fileSize:file.size,uploadedBy:user.id});await connection.execute("UPDATE documents SET status='pending',approved_by=NULL,approved_at=NULL,updated_at=NOW() WHERE id=:documentId",{documentId});await audit(connection,documentId,user.id,'version_uploaded',{version_number:versionNumber,original_name:file.originalname});await connection.commit();return this.find(documentId,user)}catch(error){await connection.rollback();await fs.unlink(file.path).catch(()=>{});throw error}finally{connection.release()}
   }
 
-  static async listAdmin(filters={},user){return this.search({...filters,status:filters.status||'',limit:filters.limit||50,user})}
+  static async listAdmin(filters={},user){return this.search({...filters,status:filters.status||'',limit:filters.limit||10,page:filters.page||1,user,includePagination:true})}
+
+  static async suggestions(value,user){
+    const needle=clean(value).toLowerCase();if(needle.length<2)return[];const access=accessSql(user);const params={...access.params,pattern:`%${needle}%`};
+    const rows=await query(`SELECT c.name category_name,d.tags FROM documents d LEFT JOIN categories c ON c.id=d.category_id WHERE d.status='published' AND ${access.clause} AND (LOWER(COALESCE(c.name,'')) LIKE :pattern OR LOWER(COALESCE(d.tags,'')) LIKE :pattern) ORDER BY d.updated_at DESC LIMIT 150`,params);
+    const suggestions=new Map();const add=(label,type)=>{const text=clean(label);if(!text||!text.toLowerCase().includes(needle))return;const key=`${type}:${text.toLowerCase()}`;const current=suggestions.get(key);suggestions.set(key,current?{...current,count:current.count+1}:{value:text,type,count:1})};
+    for(const row of rows){add(row.category_name,'section');for(const tag of safeJson(row.tags))add(tag,'tag')}
+    return [...suggestions.values()].sort((a,b)=>Number(b.value.toLowerCase().startsWith(needle))-Number(a.value.toLowerCase().startsWith(needle))||b.count-a.count||a.value.localeCompare(b.value)).slice(0,8);
+  }
 
   static async find(id,user,permission='view'){
     const rows=await query(`${selectDocument} WHERE d.id=:id LIMIT 1`,{id});const document=rows[0];if(!document)return null;

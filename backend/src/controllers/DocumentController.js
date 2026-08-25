@@ -22,10 +22,12 @@ export default class DocumentController {
 
   static async uploadVersion(req,res){if(!req.file)return res.status(400).json({message:'Select a document to upload'});try{const document=await DocumentService.addVersion(req.params.id,req.file,req.user);res.status(201).json({message:'New document version uploaded and is waiting for approval',data:document})}catch(error){await fs.unlink(req.file.path).catch(()=>{});throw error}}
 
-  static async search(req,res){if(String(req.query.q||'').length>200)return res.status(422).json({message:'Search query is too long'});res.json({data:await DocumentService.search({...req.query,user:req.user})})}
-  static async adminList(req,res){res.json({data:await DocumentService.listAdmin(req.query,req.user)})}
+  static async update(req,res){const errors={};const title=String(req.body.title||'').trim(),visibility=String(req.body.visibility||'public');if(!title)errors.title='Document title is required.';else if(title.length>255)errors.title='Document title must not exceed 255 characters.';if(!req.body.category_id||!Number.isInteger(Number(req.body.category_id)))errors.category_id='Select a valid category.';if(!['public','internal','restricted'].includes(visibility))errors.visibility='Select a valid visibility option.';if(String(req.body.tags||'').length>500)errors.tags='Search tags must not exceed 500 characters.';if(visibility==='restricted'&&!hasSelection(req.body.allowed_role_ids)&&!hasSelection(req.body.allowed_departments))errors.access='Select at least one allowed role or department.';if(Object.keys(errors).length)return res.status(422).json({message:'Please correct the highlighted fields',errors});const document=await DocumentService.update(req.params.id,req.body,req.user);if(!document)return res.status(404).json({message:'Document not found'});res.json({message:'Document updated successfully',data:document})}
 
-  static async show(req,res){const document=await DocumentService.find(req.params.id,req.user);if(!document)return res.status(404).json({message:'Document not found or access denied'});res.json({data:document})}
+  static async search(req,res){if(String(req.query.q||'').length>200)return res.status(422).json({message:'Search query is too long'});res.json({data:await DocumentService.search({...req.query,user:req.user})})}
+  static async adminList(req,res){if(String(req.query.q||'').length>200)return res.status(422).json({message:'Search query is too long'});res.json(await DocumentService.listAdmin(req.query,req.user))}
+
+  static async show(req,res){const document=await DocumentService.find(req.params.id,req.user);if(!document)return res.status(404).json({message:'Document not found or access denied'});res.json({data:[1,2].includes(Number(req.user.role_id))?{...document,...await DocumentService.permissions(document.id)}:document})}
 
   static async download(req,res){
     const document=await DocumentService.find(req.params.id,req.user,'download');

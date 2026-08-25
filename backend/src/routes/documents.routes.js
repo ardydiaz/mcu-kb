@@ -13,5 +13,6 @@ router.get('/:id/download',asyncHandler(DocumentController.download));
 router.get('/:id',asyncHandler(DocumentController.show));
 router.patch('/:id/status',allowRoles(1,2),asyncHandler(DocumentController.updateStatus));
 router.patch('/:id/access',allowRoles(1,2),asyncHandler(DocumentController.updateAccess));
+router.patch('/:id',allowRoles(1,2),asyncHandler(DocumentController.update));
 router.delete('/:id',allowRoles(1),asyncHandler(DocumentController.remove));
 export default router;
