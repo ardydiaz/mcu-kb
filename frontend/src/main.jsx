@@ -7,6 +7,7 @@ import './styles/branding.css';
 import './styles/modern.css';
 import './styles/viewer.css';
 import './styles/viewer-overrides.css';
+import './styles/office-preview.css';
 import './styles/departments.css';
 import './styles/toast.css';
 import './styles/knowledge-browser.css';

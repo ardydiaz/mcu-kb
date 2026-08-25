@@ -1,7 +1,29 @@
-import { Facebook, Instagram, Linkedin, Menu, Twitter, X, Youtube } from 'lucide-react';
-import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
-export default function PublicLayout() { const [open,setOpen]=useState(false); return <div className="site-shell">
-  <header className="topbar"><Link className="brand" to="/" aria-label="Manila Central University Knowledge Base home"><img className="header-logo" src="/images/mcu-logo-purple.png" alt="Manila Central University"/></Link><button className="menu-button" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><nav className={open?'open':''}><NavLink to="/">Home</NavLink><NavLink to="/systems">Departments</NavLink><NavLink to="/search">Documents</NavLink><Link className="login-link" to="/login">Login</Link></nav></header>
-  <main><Outlet/></main><footer><div><div className="footer-mcu"><span className="brand-seal">MCU</span><span><b>MCU</b><small>Manila Central University</small></span></div><p>Manila Central University,<br/>EDSA, Caloocan City 1400</p><p>(+632) 8364-10-71 up to 74</p><a href="mailto:hello@mcu.edu.ph">hello@mcu.edu.ph</a></div><div className="footer-column"><h4>Other Websites</h4><a href="https://mcu.edu.ph">MCU Official Website</a><a href="#">Employee Portal</a><a href="#">NEO LMS</a><a href="https://office.com">Office 365</a></div><div className="footer-column"><h4>Social Medias</h4><div className="socials"><a aria-label="Facebook" href="#"><Facebook/></a><a aria-label="Instagram" href="#"><Instagram/></a><a aria-label="Twitter" href="#"><Twitter/></a><a aria-label="YouTube" href="#"><Youtube/></a><a aria-label="LinkedIn" href="#"><Linkedin/></a></div></div><p className="copyright">© Manila Central University - All Right Reserved {new Date().getFullYear()}</p></footer>
- </div> }
+import {Facebook,Instagram,Linkedin,LogOut,Menu,Twitter,X,Youtube} from 'lucide-react';
+import {useEffect,useState} from 'react';
+import {Link,NavLink,Outlet,useNavigate} from 'react-router-dom';
+import {getCurrentUser,logout as logoutApi} from '../services/adminApi';
+
+export default function PublicLayout(){
+ const [open,setOpen]=useState(false);
+ const [profileOpen,setProfileOpen]=useState(false);
+ const [user,setUser]=useState(null);
+ const [photoFailed,setPhotoFailed]=useState(false);
+ const navigate=useNavigate();
+
+ useEffect(()=>{let active=true;getCurrentUser().then(({data})=>{if(active)setUser(data.user)}).catch(()=>{if(active)setUser(null)});return()=>{active=false}},[]);
+ const logout=async()=>{await logoutApi().catch(()=>{});localStorage.removeItem('mcu_user');localStorage.removeItem('mcu_token');setUser(null);setProfileOpen(false);navigate('/')};
+ const initials=(user?.name||user?.email||'MCU').split(/\s+/).map(part=>part[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+
+ return <div className="site-shell">
+  <header className="topbar">
+   <Link className="brand" to="/" aria-label="Manila Central University Knowledge Base home"><img className="header-logo" src="/images/mcu-logo-purple.png" alt="Manila Central University"/></Link>
+   <button className="menu-button" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button>
+   <nav className={open?'open':''}>
+    <NavLink to="/">Home</NavLink><NavLink to="/systems">Departments</NavLink><NavLink to="/search">Documents</NavLink>
+    {user?<div className="public-profile"><button className="public-profile-trigger" type="button" aria-label="Open profile menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(value=>!value)}>{!photoFailed?<img src="/api/auth/photo" alt={`${user.name}'s Microsoft profile`} onError={()=>setPhotoFailed(true)}/>:<span>{initials}</span>}</button>{profileOpen&&<div className="public-profile-menu"><div>{!photoFailed?<img src="/api/auth/photo" alt=""/>:<span>{initials}</span>}<p><strong>{user.name}</strong><small>{user.email}</small></p></div>{[1,2].includes(Number(user.role_id))&&<Link to="/admin" onClick={()=>setProfileOpen(false)}>Admin Portal</Link>}<button type="button" onClick={logout}><LogOut/> Sign out</button></div>}</div>:<Link className="login-link" to="/login">Login</Link>}
+   </nav>
+  </header>
+  <main><Outlet/></main>
+  <footer><div><div className="footer-mcu"><span className="brand-seal">MCU</span><span><b>MCU</b><small>Manila Central University</small></span></div><p>Manila Central University,<br/>EDSA, Caloocan City 1400</p><p>(+632) 8364-10-71 up to 74</p><a href="mailto:hello@mcu.edu.ph">hello@mcu.edu.ph</a></div><div className="footer-column"><h4>Other Websites</h4><a href="https://mcu.edu.ph">MCU Official Website</a><a href="#">Employee Portal</a><a href="#">NEO LMS</a><a href="https://office.com">Office 365</a></div><div className="footer-column"><h4>Social Medias</h4><div className="socials"><a aria-label="Facebook" href="#"><Facebook/></a><a aria-label="Instagram" href="#"><Instagram/></a><a aria-label="Twitter" href="#"><Twitter/></a><a aria-label="YouTube" href="#"><Youtube/></a><a aria-label="LinkedIn" href="#"><Linkedin/></a></div></div><p className="copyright">© Manila Central University - All Right Reserved {new Date().getFullYear()}</p></footer>
+ </div>;
+}
