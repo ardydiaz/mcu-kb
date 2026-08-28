@@ -3,6 +3,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import pool,{query} from '../config/database.js';
 import { uploadDirectory } from '../config/multer.js';
+import DocumentProcessingService from './DocumentProcessingService.js';
+import {analyzeSearch,isRelevant,scoreSearchText} from '../utils/searchRelevance.js';
+import QdrantService from './QdrantService.js';
 
 const admin=user=>[1,2].includes(Number(user?.role_id));
 const clean=value=>String(value||'').trim();
@@ -15,15 +18,9 @@ const documentFrom=`FROM documents d ${latestVersionJoin} LEFT JOIN categories c
 const selectDocument=`SELECT d.*,${departmentExpr} department_name,dep.code department_code,c.name category_name,c.parent_id category_parent_id,cp.id collection_id,cp.name collection_name,v.id version_id,v.version_number,v.original_name,v.stored_name,v.mime_type,v.file_size,v.created_at version_created_at,u.fullname uploader_name,a.fullname approver_name ${documentFrom}`;
 const mapDocument=row=>({...row,department:row.department_name||row.department,tags:safeJson(row.tags),size:Number(row.file_size),url:`/api/documents/${row.id}/download`});
 const audit=async(executor,documentId,userId,action,metadata={})=>executor.execute('INSERT INTO document_audit_logs (document_id,user_id,action,metadata) VALUES (:documentId,:userId,:action,:metadata)',{documentId,userId,action,metadata:JSON.stringify(metadata)});
-const stopWords=new Set(['a','an','and','are','can','document','file','find','for','from','give','how','i','in','is','me','of','on','please','show','that','the','this','to','what','where','which','who','with']);
-const searchTerms=value=>{
- const words=clean(value).toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(word=>word.length>1&&!stopWords.has(word));
- const expanded=[];
- for(const word of words){expanded.push(word);if(word.endsWith('ies')&&word.length>4)expanded.push(`${word.slice(0,-3)}y`);else if(word.endsWith('s')&&word.length>3)expanded.push(word.slice(0,-1))}
- return [...new Set(expanded)].slice(0,10);
-};
+const syncVectorPayload=async documentId=>QdrantService.syncDocument(documentId).catch(error=>console.error('Unable to synchronize Qdrant document payload:',error.message));
 
-function accessSql(user,permission='view'){
+export function accessSql(user,permission='view'){
   if(admin(user))return{clause:'1=1',params:{}};
   const capability=permission==='download'?'p.can_download=1':'p.can_view=1';
   return{clause:`(d.visibility='public' OR (d.visibility='internal' AND LOWER(COALESCE((SELECT da.name FROM departments da WHERE da.id=d.department_id),d.department))=LOWER(:userDepartment)) OR (d.visibility='restricted' AND EXISTS (SELECT 1 FROM document_permissions p WHERE p.document_id=d.id AND ${capability} AND ((p.principal_type='role' AND p.principal_value=:userRole) OR (p.principal_type='department' AND LOWER(p.principal_value)=LOWER(:userDepartment))))))`,params:{userDepartment:clean(user?.department),userRole:String(user?.role_id??'')}};
@@ -44,6 +41,7 @@ export default class DocumentService {
       await this.replacePermissions(id,{roles:metadata.allowed_role_ids,departments:metadata.allowed_departments},connection);
       await audit(connection,id,user.id,'uploaded',{visibility,department,original_name:file.originalname});
       await connection.commit();
+      await DocumentProcessingService.queue(id,versionId).catch(error=>console.error('Unable to queue document indexing:',error));
       return this.find(id,user);
     }catch(error){await connection.rollback();await fs.unlink(file.path).catch(()=>{});throw error}finally{connection.release()}
   }
@@ -63,21 +61,28 @@ export default class DocumentService {
     const title=clean(metadata.title);const categoryId=metadata.category_id?Number(metadata.category_id):null;let departmentId=null,department=null;const visibility=['public','internal','restricted'].includes(metadata.visibility)?metadata.visibility:'public';
     const categories=categoryId?await query("SELECT id,requires_department FROM categories WHERE id=:categoryId AND parent_id IS NOT NULL AND status='active' AND deleted_at IS NULL LIMIT 1",{categoryId}):[];if(!categories.length)throw Object.assign(new Error('Select a valid knowledge section'),{status:422,errors:{category_id:'Select an active child section.'}});const requiresDepartment=Boolean(categories[0].requires_department);
     if(requiresDepartment){departmentId=Number(metadata.department_id);const departments=await query('SELECT id,name FROM departments WHERE id=:departmentId AND deleted_at IS NULL LIMIT 1',{departmentId});if(!departments.length)throw Object.assign(new Error('Select a valid department'),{status:422,errors:{department_id:'This section requires an owning department.'}});department=departments[0].name}else if(visibility==='internal')throw Object.assign(new Error('Select a valid visibility'),{status:422,errors:{visibility:'Department-only access is unavailable for this section.'}});
-    const connection=await pool.getConnection();try{await connection.beginTransaction();const [result]=await connection.execute('UPDATE documents SET title=:title,department=:department,department_id=:departmentId,category_id=:categoryId,tags=:tags,visibility=:visibility,updated_at=NOW() WHERE id=:id',{id,title,department,departmentId,categoryId,tags:JSON.stringify(parseTags(metadata.tags)),visibility});if(!result.affectedRows){await connection.rollback();return null}await this.replacePermissions(id,{roles:metadata.allowed_role_ids,departments:metadata.allowed_departments},connection);await audit(connection,id,user.id,'metadata_updated',{title,category_id:categoryId,department_id:departmentId,visibility});await connection.commit();const document=await this.find(id,user);return{...document,...await this.permissions(id)}}catch(error){await connection.rollback();throw error}finally{connection.release()}
+    const connection=await pool.getConnection();try{await connection.beginTransaction();const [result]=await connection.execute('UPDATE documents SET title=:title,department=:department,department_id=:departmentId,category_id=:categoryId,tags=:tags,visibility=:visibility,updated_at=NOW() WHERE id=:id',{id,title,department,departmentId,categoryId,tags:JSON.stringify(parseTags(metadata.tags)),visibility});if(!result.affectedRows){await connection.rollback();return null}await this.replacePermissions(id,{roles:metadata.allowed_role_ids,departments:metadata.allowed_departments},connection);await audit(connection,id,user.id,'metadata_updated',{title,category_id:categoryId,department_id:departmentId,visibility});await connection.commit();await syncVectorPayload(id);const document=await this.find(id,user);return{...document,...await this.permissions(id)}}catch(error){await connection.rollback();throw error}finally{connection.release()}
   }
 
   static async search({q='',department='',type='',status='',limit=10,page=1,user,includePagination=false}={}){
-    const access=accessSql(user);const size=Math.min(Math.max(Number(limit)||10,1),50);const currentPage=Math.max(Number(page)||1,1);const offset=(currentPage-1)*size;const search=clean(q);const terms=searchTerms(search);const params={...access.params,exact:`%${search}%`,department:clean(department),type:clean(type),status:clean(status)};
+    const access=accessSql(user);const size=Math.min(Math.max(Number(limit)||10,1),50);const currentPage=Math.max(Number(page)||1,1);const offset=(currentPage-1)*size;const search=clean(q);const analysis=analyzeSearch(search),concepts=analysis.concepts;const params={...access.params,exact:`%${search}%`,department:clean(department),type:clean(type),status:clean(status)};
     const fields=['d.title','v.original_name','d.tags','d.description',departmentExpr,'c.name'];
-    const matches=terms.map((term,index)=>{params[`term${index}`]=`%${term}%`;return `(${fields.map(field=>`${field} LIKE :term${index}`).join(' OR ')})`});
-    const rankParts=terms.flatMap((_,index)=>[`IF(d.title LIKE :term${index},25,0)`,`IF(v.original_name LIKE :term${index},18,0)`,`IF(d.tags LIKE :term${index},14,0)`,`IF(c.name LIKE :term${index},12,0)`,`IF(${departmentExpr} LIKE :term${index},10,0)`,`IF(d.description LIKE :term${index},4,0)`]);
+    const matches=concepts.map((variants,conceptIndex)=>`(${variants.map((term,variantIndex)=>{const key=`term${conceptIndex}_${variantIndex}`;params[key]=`%${term}%`;return fields.map(field=>`${field} LIKE :${key}`).join(' OR ')}).join(' OR ')})`);
+    const rankParts=concepts.flatMap((variants,conceptIndex)=>variants.flatMap((_,variantIndex)=>{const key=`term${conceptIndex}_${variantIndex}`;return[`IF(d.title LIKE :${key},25,0)`,`IF(v.original_name LIKE :${key},18,0)`,`IF(d.tags LIKE :${key},8,0)`,`IF(c.name LIKE :${key},12,0)`,`IF(${departmentExpr} LIKE :${key},10,0)`,`IF(d.description LIKE :${key},4,0)`]}));
     // Require every meaningful query term to match somewhere in the document
     // metadata. This prevents a broad department term such as "ITD" from
     // returning policies when the user specifically searches for "ITD Forms".
     const searchWhere=search?(matches.length?`(${matches.join(' AND ')})`:`(d.title LIKE :exact OR v.original_name LIKE :exact)`):'1=1';
     const ranking=search?`(IF(d.title LIKE :exact,100,0)+IF(v.original_name LIKE :exact,80,0)+${rankParts.length?rankParts.join('+'):'0'}) DESC,`:'';
     const where=`WHERE ${admin(user)?"(:status='' OR d.status=:status)":"d.status='published'"} AND ${access.clause} AND ${searchWhere} AND (:department='' OR LOWER(${departmentExpr})=LOWER(:department)) AND (:type='' OR (:type='pdf' AND v.mime_type LIKE '%pdf%') OR (:type='word' AND v.mime_type LIKE '%word%') OR (:type='sheet' AND (v.mime_type LIKE '%excel%' OR v.mime_type LIKE '%spreadsheet%')))`;
-    const rows=await query(`${selectDocument} ${where} ORDER BY ${ranking}d.updated_at DESC LIMIT ${size} OFFSET ${offset}`,params);
+    let rows=await query(`${selectDocument} ${where} ORDER BY ${ranking}d.updated_at DESC LIMIT ${size} OFFSET ${offset}`,params);
+    // If strict concept matching misses because of a small spelling difference,
+    // score the permitted metadata in memory using edit-distance tolerance.
+    if(search&&!rows.length&&!includePagination){
+      const fallbackWhere=`WHERE ${admin(user)?"(:status='' OR d.status=:status)":"d.status='published'"} AND ${access.clause} AND (:department='' OR LOWER(${departmentExpr})=LOWER(:department)) AND (:type='' OR (:type='pdf' AND v.mime_type LIKE '%pdf%') OR (:type='word' AND v.mime_type LIKE '%word%') OR (:type='sheet' AND (v.mime_type LIKE '%excel%' OR v.mime_type LIKE '%spreadsheet%')))`;
+      const candidates=await query(`${selectDocument} ${fallbackWhere} ORDER BY d.updated_at DESC LIMIT 500`,params);
+      const ranked=candidates.map(row=>{const searchable=[row.title,row.original_name,row.category_name,row.department_name,row.tags].filter(Boolean).join(' ');return{row,relevance:scoreSearchText(searchable,analysis,{phraseWeight:100,coverageWeight:70})}}).filter(item=>isRelevant(item.relevance)).sort((a,b)=>b.relevance.score-a.relevance.score);const best=ranked[0]?.relevance.score||0;rows=ranked.filter(item=>best<45||item.relevance.score>=best*.75).slice(offset,offset+size).map(item=>item.row);
+    }
     const data=rows.map(mapDocument);
     if(!includePagination)return data;
     const totals=await query(`SELECT COUNT(*) total ${documentFrom} ${where}`,params);const total=Number(totals[0]?.total||0);const totalPages=Math.max(Math.ceil(total/size),1);
@@ -87,7 +92,7 @@ export default class DocumentService {
   static async addVersion(documentId,file,user){
     const document=await this.find(documentId,user);if(!document)throw Object.assign(new Error('Document not found'),{status:404});
     const connection=await pool.getConnection();
-    try{await connection.beginTransaction();const [versions]=await connection.execute('SELECT COALESCE(MAX(version_number),0)+1 next_version FROM document_versions WHERE document_id=:documentId FOR UPDATE',{documentId});const versionNumber=Number(versions[0].next_version);await connection.execute('INSERT INTO document_versions (id,document_id,version_number,original_name,stored_name,mime_type,file_size,uploaded_by) VALUES (:id,:documentId,:versionNumber,:originalName,:storedName,:mimeType,:fileSize,:uploadedBy)',{id:crypto.randomUUID(),documentId,versionNumber,originalName:file.originalname,storedName:file.filename,mimeType:file.mimetype,fileSize:file.size,uploadedBy:user.id});await connection.execute("UPDATE documents SET status='pending',approved_by=NULL,approved_at=NULL,updated_at=NOW() WHERE id=:documentId",{documentId});await audit(connection,documentId,user.id,'version_uploaded',{version_number:versionNumber,original_name:file.originalname});await connection.commit();return this.find(documentId,user)}catch(error){await connection.rollback();await fs.unlink(file.path).catch(()=>{});throw error}finally{connection.release()}
+    try{await connection.beginTransaction();const [versions]=await connection.execute('SELECT COALESCE(MAX(version_number),0)+1 next_version FROM document_versions WHERE document_id=:documentId FOR UPDATE',{documentId});const versionNumber=Number(versions[0].next_version),versionId=crypto.randomUUID();await connection.execute('INSERT INTO document_versions (id,document_id,version_number,original_name,stored_name,mime_type,file_size,uploaded_by) VALUES (:id,:documentId,:versionNumber,:originalName,:storedName,:mimeType,:fileSize,:uploadedBy)',{id:versionId,documentId,versionNumber,originalName:file.originalname,storedName:file.filename,mimeType:file.mimetype,fileSize:file.size,uploadedBy:user.id});await connection.execute("UPDATE documents SET status='pending',approved_by=NULL,approved_at=NULL,updated_at=NOW() WHERE id=:documentId",{documentId});await audit(connection,documentId,user.id,'version_uploaded',{version_number:versionNumber,original_name:file.originalname});await connection.commit();await DocumentProcessingService.queue(documentId,versionId).catch(error=>console.error('Unable to queue document indexing:',error));return this.find(documentId,user)}catch(error){await connection.rollback();await fs.unlink(file.path).catch(()=>{});throw error}finally{connection.release()}
   }
 
   static async listAdmin(filters={},user){return this.search({...filters,status:filters.status||'',limit:filters.limit||10,page:filters.page||1,user,includePagination:true})}
@@ -110,13 +115,13 @@ export default class DocumentService {
   static async updateStatus(id,status,user){
     if(!['pending','published','rejected','archived'].includes(status))throw Object.assign(new Error('Invalid document status'),{status:422});
     const result=await query("UPDATE documents SET status=:status,approved_by=IF(:status='published',:userId,NULL),approved_at=IF(:status='published',NOW(),NULL) WHERE id=:id",{id,status,userId:user.id});
-    if(!result.affectedRows)return null;await audit(pool,id,user.id,'status_changed',{status});return this.find(id,user);
+    if(!result.affectedRows)return null;await audit(pool,id,user.id,'status_changed',{status});await syncVectorPayload(id);return this.find(id,user);
   }
 
   static async updateAccess(id,{visibility,roles,departments},user){
     if(!['public','internal','restricted'].includes(visibility))throw Object.assign(new Error('Invalid visibility'),{status:422});
     const connection=await pool.getConnection();
-    try{await connection.beginTransaction();const [result]=await connection.execute('UPDATE documents SET visibility=:visibility WHERE id=:id',{id,visibility});if(!result.affectedRows){await connection.rollback();return null}const permissions=await this.replacePermissions(id,{roles,departments},connection);await audit(connection,id,user.id,'access_changed',{visibility,...permissions});await connection.commit();return this.find(id,user)}catch(error){await connection.rollback();throw error}finally{connection.release()}
+    try{await connection.beginTransaction();const [result]=await connection.execute('UPDATE documents SET visibility=:visibility WHERE id=:id',{id,visibility});if(!result.affectedRows){await connection.rollback();return null}const permissions=await this.replacePermissions(id,{roles,departments},connection);await audit(connection,id,user.id,'access_changed',{visibility,...permissions});await connection.commit();await syncVectorPayload(id);return this.find(id,user)}catch(error){await connection.rollback();throw error}finally{connection.release()}
   }
 
   static async stats(){const rows=await query("SELECT COUNT(*) documents,COUNT(DISTINCT department) departments FROM documents WHERE status='published'");return{documents:Number(rows[0]?.documents||0),departments:Number(rows[0]?.departments||0)}}
@@ -130,6 +135,6 @@ export default class DocumentService {
 
   static async remove(id,user){
     const versions=await query('SELECT stored_name FROM document_versions WHERE document_id=:id',{id});const connection=await pool.getConnection();
-    try{await connection.beginTransaction();await audit(connection,id,user.id,'deleted');const [result]=await connection.execute('DELETE FROM documents WHERE id=:id',{id});await connection.commit();if(!result.affectedRows)return null;for(const version of versions)await fs.unlink(path.join(uploadDirectory,version.stored_name)).catch(error=>{if(error.code!=='ENOENT')console.error(error)});return{id}}catch(error){await connection.rollback();throw error}finally{connection.release()}
+    try{await connection.beginTransaction();await audit(connection,id,user.id,'deleted');const [result]=await connection.execute('DELETE FROM documents WHERE id=:id',{id});await connection.commit();if(!result.affectedRows)return null;await QdrantService.removeDocument(id).catch(error=>console.error('Unable to remove Qdrant document:',error.message));for(const version of versions)await fs.unlink(path.join(uploadDirectory,version.stored_name)).catch(error=>{if(error.code!=='ENOENT')console.error(error)});return{id}}catch(error){await connection.rollback();throw error}finally{connection.release()}
   }
 }

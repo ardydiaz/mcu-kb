@@ -4,6 +4,21 @@ REST API foundation for authentication, systems, categories, users, announcement
 
 Configure `.env`, then run `npm install && npm run dev`.
 
+## Running the API
+
+Use `npm run dev` only for local development. The watch process automatically
+restarts the API when source files change, so do not start it in a second terminal.
+
+For production, use `npm start` behind a reverse proxy and run exactly one process
+manager service for each configured port. A process manager such as PM2, systemd,
+or the hosting platform should restart the service after a genuine failure. If
+multiple application instances are required, place them behind a load balancer and
+assign a separate port to each instance. Never make the API silently select a random
+port because the frontend and Microsoft Entra callback require a stable API URL.
+
+An `EADDRINUSE` startup message means another process is already listening on the
+configured `PORT`; it does not indicate a database or API-route failure.
+
 No database schema, migrations, or existing website data are bundled with this project. Define the new website's data model before enabling the database-backed endpoints.
 
 ## Document API

@@ -3,6 +3,9 @@ import path from 'node:path';
 import DocumentService from '../services/DocumentService.js';
 import { uploadDirectory } from '../config/multer.js';
 import DocumentPreviewService from '../services/DocumentPreviewService.js';
+import KnowledgeSearchService from '../services/KnowledgeSearchService.js';
+
+const matchesType=(document,type)=>!type||(type==='pdf'&&document.mime_type?.includes('pdf'))||(type==='word'&&document.mime_type?.includes('word'))||(type==='sheet'&&(document.mime_type?.includes('excel')||document.mime_type?.includes('spreadsheet')));
 
 export default class PublicDocumentController {
  static async search(req,res){
@@ -10,7 +13,20 @@ export default class PublicDocumentController {
   if(!query)return res.status(422).json({message:'Please correct the highlighted fields',errors:{q:'Enter a document title, department, category, or keyword.'}});
   if(query.length<2)return res.status(422).json({message:'Please correct the highlighted fields',errors:{q:'Search must contain at least 2 characters.'}});
   if(query.length>200)return res.status(422).json({message:'Please correct the highlighted fields',errors:{q:'Search must not exceed 200 characters.'}});
-  const documents=await DocumentService.search({q:query,department:req.query.department,type:req.query.type,limit:30,user:req.user});
+  let documents=await DocumentService.search({q:query,department:req.query.department,type:req.query.type,limit:30,user:req.user});
+  // Natural-language questions often contain words that do not appear in the
+  // title or tags. Supplement metadata matches with documents whose indexed
+  // contents contain the best permitted passages.
+  if(!documents.length){
+   const passages=await KnowledgeSearchService.retrieve(query,{user:req.user,limit:20});
+   const known=new Set();
+   for(const passage of passages){
+    if(known.has(passage.document_id))continue;
+    const document=await DocumentService.find(passage.document_id,req.user);
+    if(document&&matchesType(document,String(req.query.type||''))){documents.push(document);known.add(document.id)}
+    if(documents.length>=30)break;
+   }
+  }
   const returnParams=new URLSearchParams();
   if(query)returnParams.set('q',query);
   if(req.query.type)returnParams.set('type',String(req.query.type));

@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import DocumentService from '../services/DocumentService.js';
 import { uploadDirectory } from '../config/multer.js';
+import DocumentProcessingService from '../services/DocumentProcessingService.js';
 
 const hasSelection=value=>{if(Array.isArray(value))return value.length>0;const text=String(value||'').trim();if(!text)return false;try{const parsed=JSON.parse(text);return Array.isArray(parsed)?parsed.length>0:Boolean(parsed)}catch{return text.split(',').some(item=>item.trim())}};
 
@@ -42,4 +43,5 @@ export default class DocumentController {
   static async updateAccess(req,res){const document=await DocumentService.updateAccess(req.params.id,{visibility:req.body.visibility,roles:req.body.allowed_role_ids,departments:req.body.allowed_departments},req.user);if(!document)return res.status(404).json({message:'Document not found'});res.json({message:'Document access policy updated',data:document})}
 
   static async remove(req,res){const document=await DocumentService.remove(req.params.id,req.user);if(!document)return res.status(404).json({message:'Document not found'});res.json({message:'Document removed successfully'})}
+  static async reindex(req,res){const result=await DocumentProcessingService.reindexLatest(req.params.id);res.status(202).json({message:'Document content indexing has been queued',data:result})}
 }

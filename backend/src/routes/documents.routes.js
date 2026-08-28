@@ -9,6 +9,7 @@ router.get('/search',asyncHandler(DocumentController.search));
 router.get('/admin',allowRoles(1,2),asyncHandler(DocumentController.adminList));
 router.post('/upload',allowRoles(1,2),uploadSingle,asyncHandler(DocumentController.upload));
 router.post('/:id/versions',allowRoles(1,2),uploadSingle,asyncHandler(DocumentController.uploadVersion));
+router.post('/:id/reindex',allowRoles(1,2),asyncHandler(DocumentController.reindex));
 router.get('/:id/download',asyncHandler(DocumentController.download));
 router.get('/:id',asyncHandler(DocumentController.show));
 router.patch('/:id/status',allowRoles(1,2),asyncHandler(DocumentController.updateStatus));
