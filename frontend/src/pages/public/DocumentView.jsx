@@ -1,10 +1,10 @@
 import {ArrowLeft,FileSpreadsheet,FileText,LoaderCircle,Maximize2,Minimize2} from 'lucide-react';
 import {useEffect,useRef,useState} from 'react';
-import {Link as RouterLink,useParams,useSearchParams} from 'react-router-dom';
+import {Link as RouterLink,useLocation,useParams,useSearchParams} from 'react-router-dom';
 import {getDocumentPreviewData,getPublicDocument} from '../../services/adminApi';
 
 export default function DocumentView(){
- const {id}=useParams();const [params]=useSearchParams();const requestedReturn=params.get('returnTo')||'';const returnTo=/^\/(search(?:\?|$)|systems$)/.test(requestedReturn)?requestedReturn:'/search';const Link=props=><RouterLink {...props} to={props.to==='/search'?returnTo:props.to}/>;
+ const location=useLocation();const {id}=useParams();const [params]=useSearchParams();const requestedReturn=params.get('returnTo')||'';const returnTo=/^\/(?:search(?:\?.*)?|systems|admin(?:\/[a-z0-9-]+)?(?:\?.*)?)$/i.test(requestedReturn)?requestedReturn:'/search';const Link=props=><RouterLink {...props} to={props.to==='/search'?returnTo:props.to} state={props.to==='/search'?location.state:props.state}/>;
  const viewerRef=useRef(null);const [document,setDocument]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [fullscreen,setFullscreen]=useState(false);const [preview,setPreview]=useState(null);const [previewLoading,setPreviewLoading]=useState(false);const [previewError,setPreviewError]=useState('');const [activeSheet,setActiveSheet]=useState(0);
 
  useEffect(()=>{getPublicDocument(id).then(({data})=>setDocument(data.data)).catch(error=>setError(error.response?.data?.message||'Unable to open this document.')).finally(()=>setLoading(false))},[id]);

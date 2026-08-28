@@ -12,4 +12,8 @@ import './styles/departments.css';
 import './styles/toast.css';
 import './styles/knowledge-browser.css';
 import './styles/taxonomy.css';
+import './styles/accreditation-page.css';
+import './styles/officials-slider.css';
+import './styles/basic-education-page.css';
+import './styles/senior-high-school-page.css';
 ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><AppRoutes /></BrowserRouter></React.StrictMode>);

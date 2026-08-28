@@ -19,7 +19,7 @@ export default function PublicLayout(){
    <Link className="brand" to="/" aria-label="Manila Central University Knowledge Base home"><img className="header-logo" src="/images/mcu-logo-purple.png" alt="Manila Central University"/></Link>
    <button className="menu-button" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button>
    <nav className={open?'open':''}>
-    <NavLink to="/">Home</NavLink><NavLink to="/systems">Departments</NavLink><NavLink to="/search">Documents</NavLink>
+    <NavLink to="/" onClick={()=>setOpen(false)}>Home</NavLink><NavLink to="/accreditation" onClick={()=>setOpen(false)}>Accreditation</NavLink><NavLink to="/basic-education" onClick={()=>setOpen(false)}>Basic Education</NavLink><NavLink to="/senior-high-school" onClick={()=>setOpen(false)}>Senior High School</NavLink>
     {user?<div className="public-profile"><button className="public-profile-trigger" type="button" aria-label="Open profile menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(value=>!value)}>{!photoFailed?<img src="/api/auth/photo" alt={`${user.name}'s Microsoft profile`} onError={()=>setPhotoFailed(true)}/>:<span>{initials}</span>}</button>{profileOpen&&<div className="public-profile-menu"><div>{!photoFailed?<img src="/api/auth/photo" alt=""/>:<span>{initials}</span>}<p><strong>{user.name}</strong><small>{user.email}</small></p></div>{[1,2].includes(Number(user.role_id))&&<Link to="/admin" onClick={()=>setProfileOpen(false)}>Admin Portal</Link>}<button type="button" onClick={logout}><LogOut/> Sign out</button></div>}</div>:<Link className="login-link" to="/login">Login</Link>}
    </nav>
   </header>

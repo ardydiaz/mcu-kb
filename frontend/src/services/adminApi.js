@@ -24,7 +24,21 @@ export const updateUserStatus = (id, status) => api.patch(`/users/${id}/status`,
 export const updateUserRole = (id, role_id) => api.patch(`/users/${id}/role`, { role_id });
 export const logout = () => api.post('/auth/logout');
 export const getCurrentUser = () => api.get('/auth/me');
-export const askKnowledgeBase = (message, history = []) => api.post('/public/ask', { message, history });
+const wait=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
+export const askKnowledgeBase = async(message,history=[])=>{
+  let lastError;
+  for(let attempt=0;attempt<2;attempt++){
+    try{return await api.post('/public/ask',{message,history},{timeout:135000})}
+    catch(error){
+      lastError=error;
+      const status=error.response?.status;
+      const transient=!error.response||[502,503,504].includes(status);
+      if(!transient||attempt===1)throw error;
+      await wait(900);
+    }
+  }
+  throw lastError;
+};
 export const searchPublicDocuments = (params) => api.get('/public/documents', { params });
 export const getSearchSuggestions = (q) => api.get('/public/documents/suggestions', { params:{q} });
 export const getPublicDocument = (id) => api.get(`/public/documents/${id}`);

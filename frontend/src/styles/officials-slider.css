@@ -1,0 +1,14 @@
+.officials-feature{background-color:#fff;background-image:radial-gradient(#642b8709 1px,transparent 1px);background-size:18px 18px}
+.officials-slider{position:relative}
+.officials-slide{position:relative;overflow:hidden;border-radius:15px}
+.officials-slide .accreditation-visual{min-height:470px;background:#fff}
+.officials-slide .accreditation-visual>img{max-height:none}
+.officials-slide>button{position:absolute;top:50%;z-index:2;display:grid;place-items:center;width:48px;height:48px;border:1px solid #ded2e3;border-radius:50%;background:#fffffff0;color:var(--violet);transform:translateY(-50%);box-shadow:0 10px 30px #30004522;cursor:pointer;transition:.2s}
+.officials-slide>button:hover{background:var(--violet);color:#fff;transform:translateY(-50%) scale(1.06)}
+.officials-slide>button.previous{left:16px}
+.officials-slide>button.next{right:16px}
+.officials-slide>button svg{width:22px}
+.officials-dots{display:flex;justify-content:center;gap:7px;margin-top:18px}
+.officials-dots button{width:9px;height:9px;padding:0;border:0;border-radius:99px;background:#cdbed3;cursor:pointer;transition:.25s}
+.officials-dots button.active{width:28px;background:var(--violet)}
+@media(max-width:760px){.officials-slide .accreditation-visual{min-height:280px}.officials-slide>button{width:39px;height:39px}.officials-slide>button.previous{left:8px}.officials-slide>button.next{right:8px}}
