@@ -1,10 +1,10 @@
-import {BarChart3,Bell,FolderTree,Gauge,LogOut,Megaphone,Monitor,Settings,Users} from 'lucide-react';
+import {BarChart3,Bell,FolderTree,Gauge,LayoutTemplate,LogOut,Megaphone,Monitor,Settings,Users} from 'lucide-react';
 import {useEffect,useState} from 'react';
 import {NavLink,Outlet,useNavigate} from 'react-router-dom';
 import SessionInactivityGuard from '../components/SessionInactivityGuard';
 import {getCurrentUser,logout as logoutApi} from '../services/adminApi';
 
-const links=[['/admin',Gauge,'Dashboard'],['/admin/users',Users,'Users'],['/admin/systems',Monitor,'Documents'],['/admin/categories',FolderTree,'Categories'],['/admin/departments',FolderTree,'Departments'],['/admin/announcements',Megaphone,'Announcements'],['/admin/analytics',BarChart3,'Analytics'],['/admin/settings',Settings,'Settings']];
+const links=[['/admin',Gauge,'Dashboard'],['/admin/users',Users,'Users'],['/admin/systems',Monitor,'Documents'],['/admin/categories',FolderTree,'Categories'],['/admin/departments',FolderTree,'Departments'],['/admin/landing-pages',LayoutTemplate,'Landing Pages'],['/admin/announcements',Megaphone,'Announcements'],['/admin/analytics',BarChart3,'Analytics'],['/admin/settings',Settings,'Settings']];
 
 export default function AdminLayout(){
  const nav=useNavigate();

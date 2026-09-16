@@ -1,0 +1,70 @@
+.accreditation-video-card>iframe,
+.accreditation-video-card>video{
+  display:block;
+  width:100%;
+  aspect-ratio:16/7;
+  border:0;
+  background:#180021;
+  object-fit:cover;
+}
+@media(max-width:760px){
+  .accreditation-video-card>iframe,
+  .accreditation-video-card>video{aspect-ratio:16/10}
+}
+.bed-overview.bed-overview-image-only{display:block;padding:18px}
+.bed-overview-image-only .bed-visual{width:100%;min-height:0;background:#fff}
+.bed-overview-image-only .bed-visual>img{width:100%;height:auto;max-height:none;object-fit:contain}
+.bed-principal.bed-principal-image-only{display:block;padding:18px}
+.bed-principal-image-only>.bed-visual{display:block;width:100%;min-height:0;background:#fff}
+.bed-principal-image-only .bed-visual>img{width:100%;height:auto;max-height:none;object-fit:contain}
+.bed-video>iframe,.bed-video>video,.bed-video>img{display:block;width:100%;aspect-ratio:16/8;border:0;background:#180021;object-fit:cover}
+@media(max-width:600px){.bed-video>iframe,.bed-video>video,.bed-video>img{aspect-ratio:16/10}}
+.bed-website.bed-image-only{display:block;padding:18px}
+.bed-website.bed-image-only .bed-visual{width:100%;min-height:0;background:#fff}
+.bed-website.bed-image-only .bed-visual>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+@media(max-width:600px){.bed-website.bed-image-only{padding:10px}}
+.shs-intro.shs-intro-image-only{display:block;padding:18px}
+.shs-intro-image-only .shs-visual{width:100%;min-height:0;background:#fff}
+.shs-intro-image-only .shs-visual>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+@media(max-width:600px){.shs-intro.shs-intro-image-only{padding:10px}}
+.shs-principal.shs-principal-image-only{display:block;padding:18px}
+.shs-principal-image-only>.shs-visual{display:block;width:100%;min-height:0;background:#fff}
+.shs-principal-image-only .shs-visual>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+@media(max-width:600px){.shs-principal.shs-principal-image-only{padding:10px}}
+.shs-alumni-gallery{padding:28px}
+.shs-alumni-gallery>header{margin-bottom:24px;text-align:center}
+.shs-alumni-gallery>header h2{margin:0;color:#642b87;text-transform:uppercase;letter-spacing:.02em}
+.shs-testimonial-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.shs-testimonial-grid .shs-visual{min-height:0;border-radius:14px;background:#fff}
+.shs-testimonial-grid .shs-visual>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+@media(max-width:700px){.shs-alumni-gallery{padding:16px}.shs-testimonial-grid{grid-template-columns:1fr;gap:14px}}
+.shs-featured-video{padding:28px}
+.shs-featured-video>header{text-align:center;margin-bottom:22px}
+.shs-featured-video>header h2{margin:0;color:#17203a;font-size:clamp(25px,3vw,38px);letter-spacing:-.02em}
+.shs-featured-video>header p{margin:10px auto 0;color:#554c5d;font-size:clamp(14px,1.6vw,18px);font-style:italic;line-height:1.6}
+.shs-featured-video>div{overflow:hidden;border-radius:12px;background:#180021;box-shadow:0 18px 45px #3000451c}
+.shs-featured-video iframe,.shs-featured-video video{display:block;width:100%;aspect-ratio:16/9;border:0;background:#180021;object-fit:cover}
+@media(max-width:600px){.shs-featured-video{padding:16px}.shs-featured-video>header{margin-bottom:16px}}
+.shs-website.shs-website-image-only{display:block;padding:18px}
+.shs-website-image-only .shs-visual{width:100%;min-height:0;background:#fff}
+.shs-website-image-only .shs-visual>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+@media(max-width:600px){.shs-website.shs-website-image-only{padding:10px}}
+
+/* Keep the Senior High School featured-video inputs together in the admin editor. */
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(3),
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(4),
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(5){padding:14px;border:1px solid #e2d5e7;background:#fbf8fc}
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(3){border-radius:12px 0 0 0}
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(4){border-radius:0 12px 0 0}
+.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(5){grid-column:1/-1;margin-top:-15px;border-radius:0 0 12px 12px}
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(6),
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(7),
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(8),
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(9),
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(10),
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(11){padding:14px;border:1px solid #e2d5e7;background:#fbf8fc}
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(6),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(9){margin-top:8px;border-radius:12px 0 0 0}
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(7),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(10){margin-top:8px;border-radius:0 12px 0 0}
+.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(8),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(11){grid-column:1/-1;margin-top:-15px;border-radius:0 0 12px 12px}
+@media(max-width:760px){.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(3),.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(4),.landing-text-fields:has(>label:nth-of-type(6))>label:nth-of-type(5){grid-column:auto;margin-top:0;border-radius:10px}}
+@media(max-width:760px){.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(6),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(7),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(8),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(9),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(10),.landing-text-fields:has(>label:nth-of-type(11))>label:nth-of-type(11){grid-column:auto;margin-top:0;border-radius:10px}}

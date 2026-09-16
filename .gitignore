@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+backend/storage/landing-page-media/*
+!backend/storage/landing-page-media/.gitkeep
+npm-debug.log*

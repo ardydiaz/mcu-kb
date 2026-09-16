@@ -16,4 +16,6 @@ import './styles/accreditation-page.css';
 import './styles/officials-slider.css';
 import './styles/basic-education-page.css';
 import './styles/senior-high-school-page.css';
+import './styles/landing-pages-admin.css';
+import './styles/landing-page-video.css';
 ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><AppRoutes /></BrowserRouter></React.StrictMode>);

@@ -7,6 +7,7 @@ import Departments from '../pages/admin/Departments';
 import Accreditation from '../pages/public/Accreditation';
 import BasicEducation from '../pages/public/BasicEducation';
 import SeniorHighSchool from '../pages/public/SeniorHighSchool';
+import LandingPages from '../pages/admin/LandingPages';
 import { getCurrentUser } from '../services/adminApi';
 
 const useSession=()=>{const [state,setState]=useState({loading:true,user:null});useEffect(()=>{getCurrentUser().then(({data})=>{localStorage.setItem('mcu_user',JSON.stringify(data.user));setState({loading:false,user:data.user})}).catch(()=>{localStorage.removeItem('mcu_user');setState({loading:false,user:null})})},[]);return state};
@@ -16,6 +17,6 @@ const AdminProtected=({children})=>{const state=useSession();const location=useL
 export default function AppRoutes(){return <Routes>
  <Route element={<PublicLayout/>}><Route index element={<Home/>}/><Route path="accreditation" element={<Accreditation/>}/><Route path="basic-education" element={<BasicEducation/>}/><Route path="senior-high-school" element={<SeniorHighSchool/>}/><Route path="search" element={<Authenticated><Search/></Authenticated>}/><Route path="documents/:id" element={<Authenticated><DocumentView/></Authenticated>}/><Route path="systems" element={<Authenticated><Systems/></Authenticated>}/></Route>
  <Route element={<AuthLayout/>}><Route path="login" element={<Login/>}/></Route>
- <Route path="admin" element={<AdminProtected><AdminLayout/></AdminProtected>}><Route index element={<Dashboard/>}/><Route path="documents/:id" element={<DocumentView/>}/><Route path="users" element={<Users/>}/><Route path="systems" element={<AdminSystems/>}/><Route path="categories" element={<Categories/>}/><Route path="departments" element={<Departments/>}/><Route path="announcements" element={<Announcements/>}/><Route path="analytics" element={<Analytics/>}/><Route path="settings" element={<Settings/>}/></Route>
+ <Route path="admin" element={<AdminProtected><AdminLayout/></AdminProtected>}><Route index element={<Dashboard/>}/><Route path="documents/:id" element={<DocumentView/>}/><Route path="users" element={<Users/>}/><Route path="systems" element={<AdminSystems/>}/><Route path="categories" element={<Categories/>}/><Route path="departments" element={<Departments/>}/><Route path="landing-pages" element={<LandingPages/>}/><Route path="announcements" element={<Announcements/>}/><Route path="analytics" element={<Analytics/>}/><Route path="settings" element={<Settings/>}/></Route>
  <Route path="*" element={<Navigate to="/"/>}/>
  </Routes>}

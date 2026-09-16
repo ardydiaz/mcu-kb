@@ -1,8 +1,12 @@
 const endpoint=()=>String(process.env.OLLAMA_URL||'http://127.0.0.1:11434').replace(/\/$/,'');
-const timeout=()=>Number(process.env.OLLAMA_TIMEOUT_MS||120000);
+const timeout=operation=>Number(
+  operation==='embed'
+    ?process.env.OLLAMA_EMBEDDING_TIMEOUT_MS||15000
+    :process.env.OLLAMA_CHAT_TIMEOUT_MS||process.env.OLLAMA_TIMEOUT_MS||45000
+);
 
-async function request(path,body){
-  const response=await fetch(`${endpoint()}${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeout())});
+async function request(path,body,operation){
+  const response=await fetch(`${endpoint()}${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeout(operation))});
   if(!response.ok)throw new Error(`Ollama returned ${response.status}: ${(await response.text()).slice(0,300)}`);return response.json();
 }
 
@@ -12,7 +16,7 @@ export default class OllamaService{
 
   static async embed(input){
     if(!this.embeddingConfigured())return null;
-    const data=await request('/api/embed',{model:process.env.OLLAMA_EMBEDDING_MODEL,input,truncate:true});
+    const data=await request('/api/embed',{model:process.env.OLLAMA_EMBEDDING_MODEL,input,truncate:true},'embed');
     return Array.isArray(input)?data.embeddings:data.embeddings?.[0];
   }
 
@@ -20,7 +24,7 @@ export default class OllamaService{
     if(!this.chatConfigured())return null;
     const excerptLimit=Number(process.env.OLLAMA_MAX_EXCERPT_CHARS||1600);
     const references=contexts.slice(0,4).map(item=>`[${item.source_number}] ${item.title}${item.location?` (${item.location})`:''}\n${item.content.slice(0,excerptLimit)}`).join('\n\n');
-    const data=await request('/api/chat',{model:process.env.OLLAMA_CHAT_MODEL,stream:false,think:false,keep_alive:process.env.OLLAMA_KEEP_ALIVE||'30m',options:{temperature:0,num_ctx:Number(process.env.OLLAMA_CONTEXT_SIZE||4096),num_predict:Number(process.env.OLLAMA_MAX_ANSWER_TOKENS||180)},messages:[{role:'system',content:'You are the MCU Knowledge Base assistant. Give only a short, direct answer to the question using the approved excerpts. Use at most three concise sentences. Mention the most relevant document title when useful and cite supporting statements using [number]. Do not write an introduction, document overview, numbered list, bullet list, headings, Markdown formatting, or unrelated details. If evidence is insufficient, reply exactly: No approved document contains enough information to answer this question. Never invent facts or citations.'},{role:'user',content:`Question: ${question}\n\nApproved excerpts:\n${references}`} ]});
+    const data=await request('/api/chat',{model:process.env.OLLAMA_CHAT_MODEL,stream:false,think:false,keep_alive:process.env.OLLAMA_KEEP_ALIVE||'30m',options:{temperature:0,num_ctx:Number(process.env.OLLAMA_CONTEXT_SIZE||4096),num_predict:Number(process.env.OLLAMA_MAX_ANSWER_TOKENS||180)},messages:[{role:'system',content:'You are the MCU Knowledge Base assistant. Give only a short, direct answer to the question using the approved excerpts. Use at most three concise sentences. Mention the most relevant document title when useful and cite supporting statements using [number]. Do not write an introduction, document overview, numbered list, bullet list, headings, Markdown formatting, or unrelated details. If evidence is insufficient, reply exactly: No approved document contains enough information to answer this question. Never invent facts or citations.'},{role:'user',content:`Question: ${question}\n\nApproved excerpts:\n${references}`} ]},'chat');
     return String(data.message?.content||'').trim()||null;
   }
 
