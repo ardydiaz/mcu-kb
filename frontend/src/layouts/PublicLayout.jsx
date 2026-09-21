@@ -8,14 +8,16 @@ export default function PublicLayout(){
  const [profileOpen,setProfileOpen]=useState(false);
  const [user,setUser]=useState(null);
  const [photoFailed,setPhotoFailed]=useState(false);
+ const [scrolled,setScrolled]=useState(false);
  const navigate=useNavigate();
 
  useEffect(()=>{let active=true;getCurrentUser().then(({data})=>{if(active)setUser(data.user)}).catch(()=>{if(active)setUser(null)});return()=>{active=false}},[]);
+ useEffect(()=>{const onScroll=()=>setScrolled(window.scrollY>8);onScroll();window.addEventListener('scroll',onScroll,{passive:true});return()=>window.removeEventListener('scroll',onScroll)},[]);
  const logout=async()=>{await logoutApi().catch(()=>{});localStorage.removeItem('mcu_user');localStorage.removeItem('mcu_token');setUser(null);setProfileOpen(false);navigate('/')};
  const initials=(user?.name||user?.email||'MCU').split(/\s+/).map(part=>part[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
 
  return <div className="site-shell">
-  <header className="topbar">
+  <header className={`topbar${scrolled?' scrolled':''}`}>
    <Link className="brand" to="/" aria-label="Manila Central University Knowledge Base home"><img className="header-logo" src="/images/mcu-logo-purple.png" alt="Manila Central University"/></Link>
    <button className="menu-button" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button>
    <nav className={open?'open':''}>

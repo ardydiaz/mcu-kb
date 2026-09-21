@@ -42,6 +42,8 @@ export const askKnowledgeBase = (message,history=[])=>once(`ask:${String(message
   throw lastError;
 });
 export const searchPublicDocuments = (params) => once(`documents:${JSON.stringify(params||{})}`,()=>api.get('/public/documents', { params }));
+export const recordAnswerFeedback = (payload) => api.post('/public/ask/feedback', payload);
+export const getAnswerFeedback = () => api.get('/analytics/answer-feedback');
 export const getSearchSuggestions = (q) => api.get('/public/documents/suggestions', { params:{q} });
 export const getPublicDocument = (id) => api.get(`/public/documents/${id}`);
 export const getDocumentPreviewData = (id) => api.get(`/public/documents/${id}/preview-data`);
