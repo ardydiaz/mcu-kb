@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS answer_feedback (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  query_text VARCHAR(500) NOT NULL,
+  answer_excerpt TEXT NOT NULL,
+  vote ENUM('up','down') NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_answer_feedback_user_query (user_id, query_text),
+  CONSTRAINT fk_answer_feedback_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import RecentServiceController from '../controllers/RecentServiceController.js';
 import KnowledgeSearchController from '../controllers/KnowledgeSearchController.js';
+import AnswerFeedbackController from '../controllers/AnswerFeedbackController.js';
 import PublicDocumentController from '../controllers/PublicDocumentController.js';
 import LandingPageController from '../controllers/LandingPageController.js';
 import optionalAuth from '../middleware/optionalAuthMiddleware.js';
@@ -17,4 +18,5 @@ router.get('/documents/:id',auth,asyncHandler(PublicDocumentController.show));
 router.get('/documents/:id/preview',auth,asyncHandler(PublicDocumentController.preview));
 router.get('/documents/:id/preview-data',auth,asyncHandler(PublicDocumentController.previewData));
 router.post('/ask',auth,asyncHandler(KnowledgeSearchController.ask));
+router.post('/ask/feedback',auth,asyncHandler(AnswerFeedbackController.record));
 export default router;
