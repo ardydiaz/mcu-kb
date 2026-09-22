@@ -4,6 +4,7 @@ import KnowledgeSearchController from '../controllers/KnowledgeSearchController.
 import AnswerFeedbackController from '../controllers/AnswerFeedbackController.js';
 import PublicDocumentController from '../controllers/PublicDocumentController.js';
 import LandingPageController from '../controllers/LandingPageController.js';
+import CategoryController from '../controllers/CategoryController.js';
 import optionalAuth from '../middleware/optionalAuthMiddleware.js';
 import auth from '../middleware/authMiddleware.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -12,6 +13,7 @@ router.use(optionalAuth);
 router.get('/recent-services',asyncHandler(RecentServiceController.list));
 router.get('/landing-pages/:slug',asyncHandler(LandingPageController.show));
 router.get('/landing-page-media/:filename',LandingPageController.media);
+router.get('/categories-menu',asyncHandler(CategoryController.publicMenu));
 router.get('/documents',auth,asyncHandler(PublicDocumentController.search));
 router.get('/documents/suggestions',auth,asyncHandler(PublicDocumentController.suggestions));
 router.get('/documents/:id',auth,asyncHandler(PublicDocumentController.show));

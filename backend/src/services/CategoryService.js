@@ -29,6 +29,11 @@ export default class CategoryService {
     await CategoryModel.update(id,{...values,updatedBy:userId});
     return CategoryModel.byId(id);
   }
+  static async publicMenu() {
+    const items=(await CategoryModel.list({includeDeleted:false})).filter(item=>item.status==='active');
+    const roots=items.filter(item=>!item.parent_id);
+    return roots.map(root=>({id:root.id,name:root.name,slug:root.slug,sections:items.filter(child=>Number(child.parent_id)===Number(root.id)).map(child=>({id:child.id,name:child.name,slug:child.slug,requires_department:Boolean(child.requires_department)}))}));
+  }
   static async remove(id,userId) {
     const existing=await CategoryModel.byId(id);
     if(!existing) throw httpError(404,'Category not found');

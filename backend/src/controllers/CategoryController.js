@@ -4,6 +4,9 @@ export default class CategoryController {
     const includeDeleted=req.query.include_deleted==='true'&&[1,2].includes(Number(req.user?.role_id));
     res.json({data:await CategoryService.list({search:String(req.query.search||'').trim(),includeDeleted})});
   }
+  static async publicMenu(req,res) {
+    res.json({data:await CategoryService.publicMenu()});
+  }
   static async create(req,res) {
     const data=await CategoryService.create(req.body,req.user.id);
     res.status(201).json({message:'Category created successfully',data});

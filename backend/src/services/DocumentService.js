@@ -14,8 +14,8 @@ const parseTags=value=>parseList(value).slice(0,30);
 const safeJson=value=>{try{return typeof value==='string'?JSON.parse(value):value||[]}catch{return[]}};
 const latestVersionJoin=`JOIN document_versions v ON v.document_id=d.id AND v.version_number=(SELECT MAX(v2.version_number) FROM document_versions v2 WHERE v2.document_id=d.id)`;
 const departmentExpr=`COALESCE(dep.name,d.department)`;
-const documentFrom=`FROM documents d ${latestVersionJoin} LEFT JOIN categories c ON c.id=d.category_id LEFT JOIN categories cp ON cp.id=c.parent_id LEFT JOIN departments dep ON dep.id=d.department_id JOIN users u ON u.id=d.uploaded_by LEFT JOIN users a ON a.id=d.approved_by`;
-const selectDocument=`SELECT d.*,${departmentExpr} department_name,dep.code department_code,c.name category_name,c.parent_id category_parent_id,cp.id collection_id,cp.name collection_name,v.id version_id,v.version_number,v.original_name,v.stored_name,v.mime_type,v.file_size,v.created_at version_created_at,u.fullname uploader_name,a.fullname approver_name ${documentFrom}`;
+const documentFrom=`FROM documents d ${latestVersionJoin} LEFT JOIN categories c ON c.id=d.category_id LEFT JOIN categories cp ON cp.id=c.parent_id LEFT JOIN departments dep ON dep.id=d.department_id LEFT JOIN departments depp ON depp.id=dep.parent_id JOIN users u ON u.id=d.uploaded_by LEFT JOIN users a ON a.id=d.approved_by`;
+const selectDocument=`SELECT d.*,${departmentExpr} department_name,dep.code department_code,dep.parent_id department_parent_id,depp.name department_parent_name,c.name category_name,c.parent_id category_parent_id,cp.id collection_id,cp.name collection_name,v.id version_id,v.version_number,v.original_name,v.stored_name,v.mime_type,v.file_size,v.created_at version_created_at,u.fullname uploader_name,a.fullname approver_name ${documentFrom}`;
 const mapDocument=row=>({...row,department:row.department_name||row.department,tags:safeJson(row.tags),size:Number(row.file_size),url:`/api/documents/${row.id}/download`});
 const audit=async(executor,documentId,userId,action,metadata={})=>executor.execute('INSERT INTO document_audit_logs (document_id,user_id,action,metadata) VALUES (:documentId,:userId,:action,:metadata)',{documentId,userId,action,metadata:JSON.stringify(metadata)});
 const syncVectorPayload=async documentId=>QdrantService.syncDocument(documentId).catch(error=>console.error('Unable to synchronize Qdrant document payload:',error.message));
@@ -126,8 +126,29 @@ export default class DocumentService {
 
   static async stats(){const rows=await query("SELECT COUNT(*) documents,COUNT(DISTINCT department) departments FROM documents WHERE status='published'");return{documents:Number(rows[0]?.documents||0),departments:Number(rows[0]?.departments||0)}}
   static async browse(user){
-    const access=accessSql(user);const rows=await query(`${selectDocument} WHERE d.status='published' AND d.category_id IS NOT NULL AND c.deleted_at IS NULL AND c.status='active' AND (d.department_id IS NULL OR dep.deleted_at IS NULL) AND ${access.clause} ORDER BY COALESCE(cp.display_order,c.display_order),c.display_order,d.title LIMIT 500`,access.params);const collections=new Map();
-    for(const row of rows){const document=mapDocument(row),collectionId=row.collection_id||row.category_id,collectionName=row.collection_name||row.category_name;if(!collections.has(collectionId))collections.set(collectionId,{id:collectionId,name:collectionName,document_count:0,sections:[]});const collection=collections.get(collectionId);let section=collection.sections.find(item=>Number(item.id)===Number(row.category_id));if(!section){section={id:row.category_id,name:row.category_parent_id?row.category_name:'General',document_count:0,documents:[]};collection.sections.push(section)}section.documents.push({...document,view_url:`/documents/${document.id}?returnTo=${encodeURIComponent('/systems')}`});section.document_count++;collection.document_count++}
+    const access=accessSql(user);const rows=await query(`${selectDocument} WHERE d.status='published' AND d.category_id IS NOT NULL AND c.deleted_at IS NULL AND c.status='active' AND (d.department_id IS NULL OR dep.deleted_at IS NULL) AND ${access.clause} ORDER BY COALESCE(cp.display_order,c.display_order),c.display_order,${departmentExpr},d.title LIMIT 500`,access.params);const collections=new Map();
+    for(const row of rows){
+      const document=mapDocument(row);const collectionId=row.collection_id||row.category_id,collectionName=row.collection_name||row.category_name;
+      if(!collections.has(collectionId))collections.set(collectionId,{id:collectionId,name:collectionName,document_count:0,sections:[]});
+      const collection=collections.get(collectionId);
+      let section=collection.sections.find(item=>Number(item.id)===Number(row.category_id));
+      if(!section){section={id:row.category_id,name:row.category_parent_id?row.category_name:'General',document_count:0,departments:[]};collection.sections.push(section)}
+      const returnTo=`/systems?collection=${collectionId}`;
+      const mapped={...document,view_url:`/documents/${document.id}?returnTo=${encodeURIComponent(returnTo)}`};
+      if(row.department_id&&row.department_parent_id){
+        let parentGroup=section.departments.find(group=>Number(group.id)===Number(row.department_parent_id));
+        if(!parentGroup){parentGroup={id:row.department_parent_id,name:row.department_parent_name,document_count:0,documents:[],children:[]};section.departments.push(parentGroup)}
+        let childGroup=parentGroup.children.find(group=>Number(group.id)===Number(row.department_id));
+        if(!childGroup){childGroup={id:row.department_id,name:row.department_name,code:row.department_code,document_count:0,documents:[]};parentGroup.children.push(childGroup)}
+        childGroup.documents.push(mapped);childGroup.document_count++;parentGroup.document_count++;
+      }else{
+        const groupId=row.department_id||`general-${section.id}`;
+        let group=section.departments.find(item=>String(item.id)===String(groupId));
+        if(!group){group={id:groupId,name:row.department_id?row.department_name:'General',code:row.department_code||null,document_count:0,documents:[],children:[]};section.departments.push(group)}
+        group.documents.push(mapped);group.document_count++;
+      }
+      section.document_count++;collection.document_count++;
+    }
     return [...collections.values()];
   }
   static async departments(user){const access=accessSql(user);const rows=await query(`SELECT d.department name,COUNT(*) document_count FROM documents d WHERE d.status='published' AND ${access.clause} GROUP BY d.department ORDER BY d.department`,access.params);return rows.map((row,index)=>({id:index+1,name:row.name,description:`${row.document_count} approved ${Number(row.document_count)===1?'document':'documents'}`,category_name:'Department collection',url:`/search?q=${encodeURIComponent(row.name)}`}))}
