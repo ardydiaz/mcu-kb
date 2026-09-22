@@ -4,7 +4,7 @@ import {Link as RouterLink,useLocation,useParams,useSearchParams} from 'react-ro
 import {getDocumentPreviewData,getPublicDocument} from '../../services/adminApi';
 
 export default function DocumentView(){
- const location=useLocation();const {id}=useParams();const [params]=useSearchParams();const requestedReturn=params.get('returnTo')||'';const returnTo=/^\/(?:search(?:\?.*)?|systems|admin(?:\/[a-z0-9-]+)?(?:\?.*)?)$/i.test(requestedReturn)?requestedReturn:'/search';const Link=props=><RouterLink {...props} to={props.to==='/search'?returnTo:props.to} state={props.to==='/search'?location.state:props.state}/>;
+ const location=useLocation();const {id}=useParams();const [params]=useSearchParams();const requestedReturn=params.get('returnTo')||'';const returnTo=/^\/(?:search(?:\?.*)?|systems(?:\?.*)?|admin(?:\/[a-z0-9-]+)?(?:\?.*)?)$/i.test(requestedReturn)?requestedReturn:'/search';const Link=props=><RouterLink {...props} to={props.to==='/search'?returnTo:props.to} state={props.to==='/search'?location.state:props.state}/>;
  const viewerRef=useRef(null);const [document,setDocument]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [fullscreen,setFullscreen]=useState(false);const [preview,setPreview]=useState(null);const [previewLoading,setPreviewLoading]=useState(false);const [previewError,setPreviewError]=useState('');const [activeSheet,setActiveSheet]=useState(0);const [zoom,setZoom]=useState(100);
 
  useEffect(()=>{setZoom(100)},[id]);

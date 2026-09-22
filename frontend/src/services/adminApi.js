@@ -48,6 +48,7 @@ export const getSearchSuggestions = (q) => api.get('/public/documents/suggestion
 export const getPublicDocument = (id) => api.get(`/public/documents/${id}`);
 export const getDocumentPreviewData = (id) => api.get(`/public/documents/${id}/preview-data`);
 export const getKnowledgeTree = () => api.get('/knowledge/categories');
+export const getPublicCategoryMenu = () => api.get('/public/categories-menu');
 export const getLandingPages = () => api.get('/landing-pages');
 export const getLandingPage = (slug) => api.get(`/landing-pages/${slug}`);
 export const updateLandingPage = (slug,content) => api.put(`/landing-pages/${slug}`,{content});
