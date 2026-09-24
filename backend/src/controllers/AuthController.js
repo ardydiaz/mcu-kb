@@ -8,7 +8,7 @@ import { uploadDirectory } from '../config/multer.js';
 
 const oauthStateCookie='mcu_oauth_state';
 const oauthReturnCookie='mcu_oauth_return';
-const frontendUrl=()=>process.env.FRONTEND_URL||'http://localhost:5174';
+const frontendUrl=()=>process.env.FRONTEND_URL||'http://localhost:6001';
 const saveSession=(res,session)=>res.cookie(sessionCookieName,session.token,sessionCookieOptions());
 const avatarDirectory=path.join(uploadDirectory,'avatars');
 const avatarExtensions=['jpg','png','webp'];
