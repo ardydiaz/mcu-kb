@@ -1,5 +1,7 @@
-.knowledge-browser{position:relative;min-height:100vh;background:#fff}
-.knowledge-hero{position:relative;overflow:hidden;isolation:isolate;background:var(--purple);padding:56px 24px 100px;text-align:center;color:#fff}
+.knowledge-browser{position:relative;min-height:100vh;overflow:hidden;background:linear-gradient(180deg,#f8f4fa 0%,#fbf9fc 55%,#fff 100%)}
+/* Background accent: soft brand-colored glows over a faint dot grid */
+.knowledge-browser::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(620px 420px at 6% 32%,#eed7fb 0%,transparent 70%),radial-gradient(560px 400px at 94% 40%,#ffecc7 0%,transparent 70%),radial-gradient(520px 380px at 78% 88%,#d8f3f6 0%,transparent 70%),radial-gradient(480px 360px at 18% 92%,#fde3ee 0%,transparent 70%),radial-gradient(#3000451a 1px,transparent 1.5px) 0 0/22px 22px}
+.knowledge-hero{position:relative;z-index:1;overflow:hidden;isolation:isolate;background:var(--purple);padding:56px 24px 100px;text-align:center;color:#fff}
 .knowledge-hero-compliance{background-image:linear-gradient(125deg,rgba(48,0,69,.88) 0%,rgba(48,0,69,.6) 55%,rgba(48,0,69,.3) 100%),url('/images/compliance-banner.jpg');background-size:cover;background-position:center}
 .knowledge-hero-grid{position:absolute;inset:0;z-index:0;opacity:.6;background-image:linear-gradient(#ffffff16 1px,transparent 1px),linear-gradient(90deg,#ffffff16 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(circle at 50% 0%,#000,transparent 75%)}
 .knowledge-hero-inner{position:relative;z-index:2;max-width:900px;margin:0 auto}
@@ -14,8 +16,13 @@
 .knowledge-search-bar button svg{width:15px}
 .knowledge-sections{width:min(1200px,calc(100% - 32px));margin:-58px auto 90px;position:relative;z-index:1}
 .knowledge-section-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
-.knowledge-section-card{background:#fff;border:1px solid #e7dfeb;border-radius:20px;box-shadow:0 25px 65px #30004512;overflow:hidden}
-.knowledge-section-card>header{display:flex;align-items:center;gap:14px;padding:22px 24px;border-bottom:1px solid #f0eaf3}
+.knowledge-section-card{--card-accent:var(--violet);--card-tint:#f6effa;background:#fff;border:1px solid #e7dfeb;border-radius:20px;box-shadow:0 25px 65px #30004512;overflow:hidden}
+.knowledge-section-card:nth-of-type(4n+1){--card-accent:#e7aa28;--card-tint:#fff8e8}
+.knowledge-section-card:nth-of-type(4n+2){--card-accent:#8aa800;--card-tint:#f6fae6}
+.knowledge-section-card:nth-of-type(4n+3){--card-accent:#078292;--card-tint:#eaf9fa}
+.knowledge-section-card:nth-of-type(4n+4){--card-accent:var(--pink);--card-tint:#fdeef4}
+.knowledge-section-card:only-child{grid-column:1/-1;justify-self:center;width:min(820px,100%)}
+.knowledge-section-card>header{display:flex;align-items:center;gap:14px;padding:22px 24px;border-bottom:1px solid #f0eaf3;background:linear-gradient(180deg,var(--card-tint),#fff);box-shadow:inset 0 4px 0 var(--card-accent)}
 .knowledge-section-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;background:#f1e8f5;color:var(--violet)}
 .knowledge-section-card:nth-of-type(4n+1) .knowledge-section-icon{background:#fff3d7;color:#a56600}
 .knowledge-section-card:nth-of-type(4n+2) .knowledge-section-icon{background:#eff7d5;color:#617800}
