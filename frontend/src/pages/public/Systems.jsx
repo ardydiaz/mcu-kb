@@ -1,22 +1,23 @@
-import {BookOpen,Building2,ChevronDown,FileText,LibraryBig,Search} from 'lucide-react';
-import {useEffect,useMemo,useState} from 'react';
-import {Link,useSearchParams} from 'react-router-dom';
+import {ArrowRight,BookOpen,Building2,ChevronDown,FileText,LibraryBig,Search} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {Link,useNavigate,useSearchParams} from 'react-router-dom';
 import {getKnowledgeTree,getPublicCategoryMenu} from '../../services/adminApi';
+import useScrollReveal from '../../hooks/useScrollReveal';
 
-const filterDepartment=(department,q)=>{
- const children=(department.children||[]).map(child=>({...child,documents:q?child.documents.filter(document=>document.title.toLowerCase().includes(q)):child.documents})).filter(child=>!q||child.name.toLowerCase().includes(q)||child.documents.length>0);
- const selfMatches=!q||department.name.toLowerCase().includes(q);
- const documents=selfMatches?department.documents:department.documents.filter(document=>document.title.toLowerCase().includes(q));
- if(q&&!selfMatches&&!documents.length&&!children.length)return null;
- return {...department,documents,children};
-};
+const splitTitle=title=>{const match=/^([A-Z]{2,}(?:-[A-Z0-9]+)+)\s+(.+)$/.exec(title||'');return match?{code:match[1],name:match[2]}:{code:'',name:title}};
+// Remembers which dropdowns were open and the scroll position so "Back to results" returns to the same spot
+const VIEW_KEY='kb:systems-view';
+const saveView=view=>{try{sessionStorage.setItem(VIEW_KEY,JSON.stringify(view))}catch{}};
+const readView=()=>{try{return JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null')}catch{return null}};
+const clearView=()=>{try{sessionStorage.removeItem(VIEW_KEY)}catch{}};
+function DocumentRow({document,onOpen}){const {code,name}=splitTitle(document.title);return <Link className="knowledge-doc-row" to={document.view_url} onClick={onOpen}><span className="kdoc-icon"><FileText/></span><span className="kdoc-text"><strong>{name}</strong><small>{code&&<em className="kdoc-code">{code}</em>}Version {document.version_number}</small></span><ArrowRight className="knowledge-doc-arrow"/></Link>}
 
 export default function Systems(){
  const [params]=useSearchParams();
+ const navigate=useNavigate();
  const [collections,setCollections]=useState([]);
  const [activeCollection,setActiveCollection]=useState(null);
  const [query,setQuery]=useState('');
- const [sectionFilter,setSectionFilter]=useState(params.get('section')||'');
  const [openKeys,setOpenKeys]=useState(()=>new Set());
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
@@ -32,25 +33,28 @@ export default function Systems(){
    setCollections(merged);
   }).catch(error=>setError(error.response?.data?.message||'Unable to load the knowledge library.')).finally(()=>setLoading(false))},[]);
 
- useEffect(()=>{if(!collections.length)return;const requested=params.get('collection');const match=requested&&collections.find(item=>String(item.id)===requested);setActiveCollection(match?match.id:collections[0].id);setSectionFilter(params.get('section')||'');setQuery('');setOpenKeys(new Set())},[params,collections]);
+ const pendingScroll=useRef(null);
+ useEffect(()=>{if(!collections.length)return;const requested=params.get('collection');const match=requested&&collections.find(item=>String(item.id)===requested);const id=match?match.id:collections[0].id;const saved=readView();const restore=saved&&String(saved.collection)===String(id);setActiveCollection(id);setQuery('');setOpenKeys(new Set(restore?saved.openKeys:[]));pendingScroll.current=restore?saved.scrollY:null;if(!restore)clearView()},[params,collections]);
 
  const collection=collections.find(item=>Number(item.id)===Number(activeCollection));
- const toggle=key=>setOpenKeys(current=>{const next=new Set(current);if(next.has(key))next.delete(key);else next.add(key);return next});
- const q=query.trim().toLowerCase();
- const sections=useMemo(()=>(collection?.sections||[]).filter(section=>!sectionFilter||String(section.id)===String(sectionFilter)).map(section=>({...section,departments:section.departments.map(department=>filterDepartment(department,q)).filter(Boolean)})),[collection,sectionFilter,q]);
+ useEffect(()=>{if(pendingScroll.current==null||!collection)return;const y=pendingScroll.current;pendingScroll.current=null;clearView();requestAnimationFrame(()=>window.scrollTo(0,y))},[collection,openKeys]);
+ const rememberView=()=>saveView({collection:activeCollection,openKeys:[...openKeys],scrollY:window.scrollY});
+ // Accordion: opening a department/office closes its open siblings (and their nested offices); closing also closes anything nested inside
+ const toggle=key=>setOpenKeys(current=>{const next=new Set(current);const inside=item=>item===key||item.startsWith(`${key}:`);if(current.has(key)){next.forEach(item=>{if(inside(item))next.delete(item)});return next}const parent=key.slice(0,key.lastIndexOf(':')+1);next.forEach(item=>{if(item.startsWith(parent)&&!inside(item))next.delete(item)});next.add(key);return next});
+ const sections=collection?.sections||[];
+ useScrollReveal('.knowledge-section-card',{interval:100},[activeCollection]);
+
+ const submitSearch=event=>{event.preventDefault();const field=event.currentTarget.querySelector('input');field.setCustomValidity('');if(query.trim().length<2){field.setCustomValidity(query.trim()?'Search must contain at least 2 characters.':'Enter a document title, department, category, or keyword.');field.addEventListener('input',()=>field.setCustomValidity(''),{once:true});field.reportValidity();return}navigate(`/search?q=${encodeURIComponent(query.trim())}`)};
 
  return <main className="knowledge-browser">
-  <section className="knowledge-hero">
+  <section className={`knowledge-hero${collection?.name==='Compliance'?' knowledge-hero-compliance':''}`}>
+   {collection?.name!=='Compliance'&&<><div className="knowledge-hero-grid"/><div className="hero-aurora aurora-one"/><div className="hero-aurora aurora-two"/></>}
    <div className="knowledge-hero-inner">
     <span className="knowledge-hero-kicker"><LibraryBig/> MCU Knowledge Library</span>
     <h1>{collection?.name||'Browse knowledge collections'}</h1>
-    <form className="knowledge-search-bar" onSubmit={event=>event.preventDefault()}>
+    <form className="knowledge-search-bar" onSubmit={submitSearch}>
      <Search/>
-     <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search departments or documents"/>
-     <select value={sectionFilter} onChange={event=>setSectionFilter(event.target.value)}>
-      <option value="">All Categories</option>
-      {(collection?.sections||[]).map(section=><option key={section.id} value={section.id}>{section.name}</option>)}
-     </select>
+     <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search educational organization, student college handbook"/>
      <button type="submit"><Search/> Search</button>
     </form>
    </div>
@@ -64,30 +68,30 @@ export default function Systems(){
      {section.requires_department?
       <div className="knowledge-department-list">{section.departments.length?section.departments.map(department=>{
        const key=`${section.id}:${department.id}`,open=openKeys.has(key);
-       return <div className="knowledge-dept-group" key={department.id}>
+       return <div className={`knowledge-dept-group${open?' open':''}`} key={department.id}>
         <button type="button" className="knowledge-dept-row" onClick={()=>toggle(key)}>
          <span className="kd-icon"><Building2/></span>
          <span><strong>{department.name}</strong><small>{department.document_count} {department.document_count===1?'document':'documents'}</small></span>
          <ChevronDown className={open?'open':''}/>
         </button>
         {open&&<div className="knowledge-dept-body">
-         {department.documents.map(document=><Link className="knowledge-doc-row" to={document.view_url} key={document.id}><span className="kdoc-icon"><FileText/></span><span><strong>{document.title}</strong><small>Version {document.version_number}</small></span></Link>)}
+         {department.documents.map(document=><DocumentRow document={document} onOpen={rememberView} key={document.id}/>)}
          {(department.children||[]).map(office=>{
           const officeKey=`${key}:${office.id}`,officeOpen=openKeys.has(officeKey);
-          return <div className="knowledge-office-group" key={office.id}>
+          return <div className={`knowledge-office-group${officeOpen?' open':''}`} key={office.id}>
            <button type="button" className="knowledge-office-row" onClick={()=>toggle(officeKey)}>
             <span className="ko-icon"><BookOpen/></span>
             <span><strong>{office.name}</strong><small>{office.document_count} {office.document_count===1?'document':'documents'}</small></span>
             <ChevronDown className={officeOpen?'open':''}/>
            </button>
-           {officeOpen&&<div className="knowledge-office-body">{office.documents.map(document=><Link className="knowledge-doc-row" to={document.view_url} key={document.id}><span className="kdoc-icon"><FileText/></span><span><strong>{document.title}</strong><small>Version {document.version_number}</small></span></Link>)}</div>}
+           {officeOpen&&<div className="knowledge-office-body">{office.documents.map(document=><DocumentRow document={document} onOpen={rememberView} key={document.id}/>)}</div>}
           </div>;
          })}
         </div>}
        </div>;
-      }):<p className="knowledge-empty-note">{q?'No departments match your search in this section.':'No documents have been added to this section yet.'}</p>}</div>
+      }):<p className="knowledge-empty-note">No documents have been added to this section yet.</p>}</div>
       :
-      <div className="knowledge-flat-documents">{flatDocuments.length?flatDocuments.map(document=><Link className="knowledge-doc-row" to={document.view_url} key={document.id}><span className="kdoc-icon"><FileText/></span><span><strong>{document.title}</strong><small>Version {document.version_number}</small></span></Link>):<p className="knowledge-empty-note">{q?'No documents match your search in this section.':'No documents have been added to this section yet.'}</p>}</div>
+      <div className="knowledge-flat-documents">{flatDocuments.length?flatDocuments.map(document=><DocumentRow document={document} onOpen={rememberView} key={document.id}/>):<p className="knowledge-empty-note">No documents have been added to this section yet.</p>}</div>
      }
     </article>;})}</div>}
   </section>
